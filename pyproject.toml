@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enappsys"
+description = """
+    The EnAppSys Python client provides a light-weight client that allows for simple access
+    to EnAppSys' API services.
+    """
+license = {text = "Proprietary"}
+authors = [
+    {name = "Silvan Murre", email = "silvan.murre@montelgroup.com"},
+]
+classifiers = [
+    "Private :: Do not Upload",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "requests",
+]
+dynamic = ["version", "readme"]
+
+[project.optional-dependencies]
+async = [
+    "aiohttp"
+]
+pandas = [
+    "pandas"
+]
+dev = [
+    "enappsys[async]",
+    "enappsys[pandas]",
+    "pre-commit",
+    "pytest-asyncio",
+    "pytest-benchmark",
+    "pytest",
+    "ruff",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.dynamic]
+version = {attr = "enappsys.__version__"}
+readme = {file = ["README.md"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
