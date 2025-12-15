@@ -1,21 +1,23 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "enappsys"
+authors = [
+    {name = "Silvan Murre", email = "silvan.murre@montel.energy"},
+]
 description = """
     The EnAppSys Python client provides a light-weight client that allows for simple access
     to EnAppSys' API services.
     """
-license = {text = "Proprietary"}
-authors = [
-    {name = "Silvan Murre", email = "silvan.murre@montelgroup.com"},
-]
-classifiers = [
-    "Private :: Do not Upload",
-]
 requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
 dependencies = [
     "requests",
 ]
