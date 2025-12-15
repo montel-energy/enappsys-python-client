@@ -13,7 +13,7 @@ pip install enappsys[async,pandas]
 The extras are optional:
 
 - `async` required for using the `EnAppSysAsync` asynchronous client.
-- `pandas` required for converting API responses to DataFrames, e.g. via `client_response.to_df()
+- `pandas` required for converting API responses to DataFrames, e.g. via `client_response.to_df()`
 
 If you only need the synchronous client and raw responses, install without extras:
 
