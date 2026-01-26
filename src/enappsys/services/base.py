@@ -67,8 +67,10 @@ class APIBase:
             raise ValidationError(reason="Provide a valid str", parameter="data_type")
 
     @staticmethod
-    def _add_entities(params, entities: list, api_name: str = "entities"):
-        if isinstance(entities, list):
+    def _add_entities(params, entities: Union[str, list], api_name: str = "entities"):
+        if isinstance(entities, str):
+            params[api_name] = [entities]
+        elif isinstance(entities, list):
             params[api_name] = entities
         else:
             raise ValidationError(reason="Provide a valid list", parameter="entities")
