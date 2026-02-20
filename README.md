@@ -2,6 +2,12 @@
 
 The Python library for the [EnAppSys](https://app.enappsys.com) platform provides a light-weight, typed Python client to interact with EnAppSys' API services. Additionally, there is an asynchronous client for non-blocking operations.
 
+## Project Status
+
+This project is in active development (0.x release series).
+While the core API structure is expected to remain stable,
+minor breaking changes may occur between releases.
+
 ## Installation
 
 Supports Python 3.10+
