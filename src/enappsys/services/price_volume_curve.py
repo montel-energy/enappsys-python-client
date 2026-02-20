@@ -1,24 +1,21 @@
 from __future__ import annotations
 
 import io
-import logging
 
 from datetime import datetime
-from typing import Any, Dict, Literal, overload, TYPE_CHECKING, Union
+from typing import Literal, overload, TYPE_CHECKING
 
-from .base import APIBase
-from ..enum import (
+from enappsys.enum import (
     CurrencyEnum,
     DelimiterEnum,
     ResponseFormatEnum,
     TimeZoneEnum,
 )
-from ..utils import validate_rename_columns_length
+from enappsys.services.base import APIBase
+from enappsys.utils import validate_rename_columns_length
 
 if TYPE_CHECKING:
     import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 
 class PriceVolumeCurveBase:
@@ -120,35 +117,35 @@ class PriceVolumeCurveAPI(APIBase):
     @overload
     def get(
         self,
-        response_format: Literal["csv", ResponseFormatEnum.CSV],
+        response_format: Literal["csv"] | ResponseFormatEnum.CSV,
         code: str,
-        dt: Union[datetime, str],
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
-        delimiter: DelimiterEnum = "comma",
+        dt: datetime | str,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
+        delimiter: str | DelimiterEnum = "comma",
     ) -> PriceVolumeCurveCSV: ...
     
     @overload
     def get(
         self,
-        response_format: Literal["xml", ResponseFormatEnum.XML],
+        response_format: Literal["xml"] | ResponseFormatEnum.XML,
         code: str,
-        dt: Union[datetime, str],
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        dt: datetime | str,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
     ) -> PriceVolumeCurveXML: ...
 
     def get(
         self,
-        response_format: Union[str, ResponseFormatEnum],
+        response_format: Literal["csv", "xml"] | ResponseFormatEnum,
         code: str,
-        dt: Union[datetime, str],
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
-        delimiter: DelimiterEnum = "comma",
-    ) -> Union[PriceVolumeCurveCSV, PriceVolumeCurveXML]:
+        dt: datetime | str,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
+        delimiter: str | DelimiterEnum = "comma",
+    ) -> PriceVolumeCurveCSV | PriceVolumeCurveXML:
         response_format = self._get_response_format(response_format)
-        params: Dict[str, Any] = {}
+        params = {}
         self._add_code(params, code)
         dt = self._add_dt(params, dt, "minperiod", "dt")
         self._add_time_zone(params, time_zone)

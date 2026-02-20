@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Literal, overload, Union
+from typing import Literal, overload
 
-from .base import APIBaseAsync
-from ..services.bulk import BulkCSV, BulkJSON, BulkJSONMap, BulkXML
-from ..enum import (
+from enappsys.enum import (
     DelimiterEnum,
     ResponseFormatEnum,
     ResolutionEnum,
     TimeZoneEnum,
 )
-from ..exceptions import ContentTooLarge
+from enappsys.exceptions import ContentTooLarge
+from enappsys.services_async.base import APIBaseAsync
+from enappsys.services.bulk import BulkCSV, BulkJSON, BulkJSONMap, BulkXML
 
 
 class AsyncBulkAPI(APIBaseAsync):
@@ -25,70 +25,70 @@ class AsyncBulkAPI(APIBaseAsync):
     @overload
     async def get(
         self,
-        response_format: Literal["csv", ResponseFormatEnum.CSV],
+        response_format: Literal["csv"] | ResponseFormatEnum.CSV,
         data_type: str,
         entities: list,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
-        delimiter: DelimiterEnum = "comma",
+        delimiter: str | DelimiterEnum = "comma",
     ) -> BulkCSV: ...
 
     @overload
     async def get(
         self,
-        response_format: Literal["json", ResponseFormatEnum.JSON],
+        response_format: Literal["json"] | ResponseFormatEnum.JSON,
         data_type: str,
         entities: list,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
     ) -> BulkJSON: ...
     
     @overload
     async def get(
         self,
-        response_format: Literal["json_map", ResponseFormatEnum.JSON_MAP],
+        response_format: Literal["json_map"] | ResponseFormatEnum.JSON_MAP,
         data_type: str,
         entities: list,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
     ) -> BulkJSONMap: ...
 
     @overload
     async def get(
         self,
-        response_format: Literal["xml", ResponseFormatEnum.XML],
+        response_format: Literal["xml"] | ResponseFormatEnum.XML,
         data_type: str,
         entities: list,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
     ) -> BulkXML: ...
 
     async def get(
         self,
-        response_format: ResponseFormatEnum,
+        response_format: Literal["csv", "json", "json_map", "xml"] | ResponseFormatEnum,
         data_type: str,
         entities: list,
-        start_dt,
-        end_dt,
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
-        delimiter: DelimiterEnum = "comma",
-    ) -> Union[BulkCSV, BulkJSON, BulkJSONMap, BulkXML]:
+        delimiter: str | DelimiterEnum = "comma",
+    ) -> BulkCSV | BulkJSON | BulkJSONMap | BulkXML:
         response_format = self._get_response_format(response_format)
-        params: Dict[str, Any] = {}
+        params = {}
         self._add_data_type(params, data_type)
         self._add_entities(params, entities)
         self._add_dt(params, start_dt, "start", "start_dt")

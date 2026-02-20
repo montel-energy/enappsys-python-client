@@ -1,12 +1,7 @@
 import asyncio
 import pandas as pd
-import logging
-from enappsys import EnAppSysAsync
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+from enappsys import EnAppSysAsync
 
 
 async def main(start_dt, end_dt):
@@ -21,7 +16,7 @@ async def main(start_dt, end_dt):
             time_zone="CET",
         )
         df_freq = freq.to_df(rename_columns=["freq"], unit_in_columns=False)
-        df_freq.to_csv("freq.csv")
+        df_freq.to_csv("data/freq.csv")
 
         tz = df_freq.index.tz
         start = pd.Timestamp(start_dt).tz_localize(tz)

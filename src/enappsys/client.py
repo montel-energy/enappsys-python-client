@@ -1,7 +1,7 @@
-from .services.bulk import BulkAPI
-from .services.chart import ChartAPI
-from .services.price_volume_curve import PriceVolumeCurveAPI
-from .session import Session
+from enappsys.services.bulk import BulkAPI
+from enappsys.services.chart import ChartAPI
+from enappsys.services.price_volume_curve import PriceVolumeCurveAPI
+from enappsys.session import Session
 
 
 class EnAppSys:
@@ -10,7 +10,8 @@ class EnAppSys:
         user: str | None = None,
         secret: str | None = None,
         credentials_file: str | None = None,
-        max_retries: int = 3
+        max_retries: int = 3,
+        agent_id: str | None = None,
     ):
         """
         Client interface for the EnAppSys API.
@@ -32,8 +33,10 @@ class EnAppSys:
             Defaults to ``~/.credentials/enappsys.json``.
         max_retries : int, default=3
             Maximum number of retry attempts for failed HTTP requests.
+        agent_id : str | None, optional
+            Optional agent identifier to include in the User-Agent header.
         """
-        self._session = Session(user, secret, credentials_file, max_retries)
+        self._session = Session(user, secret, credentials_file, max_retries, agent_id)
 
         # --- Public members ---
         self.bulk = BulkAPI(self)
@@ -58,3 +61,13 @@ class EnAppSys:
         Provides access to the Price Volume Curve API for retrieving 
         price volume curves from charts.
         """
+
+    def close(self) -> None:
+        """Close the underlying HTTP session."""
+        self._session.session.close()
+
+    def __enter__(self) -> "EnAppSys":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()

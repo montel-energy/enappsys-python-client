@@ -8,8 +8,8 @@ authors = [
     {name = "Silvan Murre", email = "silvan.murre@montel.energy"},
 ]
 description = """The EnAppSys Python client provides a light-weight client that allows for simple access to EnAppSys' API services."""
-readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.7"
+readme = "README.md"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -31,7 +31,6 @@ pandas = [
 dev = [
     "enappsys[async]",
     "enappsys[pandas]",
-    "pre-commit",
     "pytest-asyncio",
     "pytest-benchmark",
     "pytest",

@@ -4,7 +4,7 @@ import os
 
 from pathlib import Path
 
-from .exceptions import (
+from enappsys.exceptions import (
     NoCredentialsError,
     PartialCredentialsError,
     InvalidCredentialsFile,

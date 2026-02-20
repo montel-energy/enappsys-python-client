@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Literal, overload, Union
+from typing import Literal, overload
 
-from .base import APIBaseAsync
-from ..services.chart import ChartCSV, ChartJSON, ChartJSONMap, ChartXML
-from ..enum import (
+from enappsys.enum import (
     CurrencyEnum,
     DelimiterEnum,
     ResolutionEnum,
     ResponseFormatEnum,
     TimeZoneEnum,
 )
-from ..exceptions import ContentTooLarge
+from enappsys.exceptions import ContentTooLarge
+from enappsys.services_async.base import APIBaseAsync
+from enappsys.services.chart import ChartCSV, ChartJSON, ChartJSONMap, ChartXML
 
 
 class AsyncChartAPI(APIBaseAsync):
@@ -26,37 +26,37 @@ class AsyncChartAPI(APIBaseAsync):
     @overload
     async def get(
         self,
-        response_format: Literal["csv", ResponseFormatEnum.CSV],
+        response_format: Literal["csv"] | ResponseFormatEnum.CSV,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
         min_avg_max: bool,
-        delimiter: DelimiterEnum = "comma",
+        delimiter: str | DelimiterEnum = "comma",
     ) -> ChartCSV: ...
     
     @overload
     async def get(
         self,
-        response_format: Literal["json", ResponseFormatEnum.JSON],
+        response_format: Literal["json"] | ResponseFormatEnum.JSON,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
         min_avg_max: bool,
     ) -> ChartJSON: ...
 
     @overload
     async def get(
         self,
-        response_format: Literal["json_map", ResponseFormatEnum.JSON_MAP],
+        response_format: Literal["json_map"] | ResponseFormatEnum.JSON_MAP,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
+        start_dt: str | datetime,
+        end_dt: str | datetime,
         resolution: ResolutionEnum,
         time_zone: TimeZoneEnum,
         currency: CurrencyEnum,
@@ -66,30 +66,30 @@ class AsyncChartAPI(APIBaseAsync):
     @overload
     async def get(
         self,
-        response_format: Literal["xml", ResponseFormatEnum.XML],
+        response_format: Literal["xml"] | ResponseFormatEnum.XML,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
         min_avg_max: bool,
     ) -> ChartXML: ...
 
     async def get(
         self,
-        response_format: Union[str, ResponseFormatEnum],
+        response_format: Literal["csv", "json", "json_map", "xml"] | ResponseFormatEnum,
         code: str,
-        start_dt,
-        end_dt,
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum = "UTC",
-        currency: CurrencyEnum = "EUR",
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum = "UTC",
+        currency: str | CurrencyEnum = "EUR",
         min_avg_max: bool = False,
-        delimiter: DelimiterEnum = "comma",
-    ) -> Union[ChartCSV, ChartJSON, ChartJSONMap, ChartXML]:
+        delimiter: str | DelimiterEnum = "comma",
+    ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
         response_format = self._get_response_format(response_format)
-        params: Dict[str, Any] = {}
+        params = {}
         self._add_code(params, code)
         self._add_dt(params, start_dt, "start", "start_dt")
         self._add_dt(params, end_dt, "end", "end_dt")

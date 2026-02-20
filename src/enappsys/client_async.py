@@ -1,10 +1,7 @@
-from typing import Literal, Union
-
-from .enum import AppEnvEnum
-from .services_async.bulk import AsyncBulkAPI
-from .services_async.chart import AsyncChartAPI
-from .services_async.price_volume_curve import AsyncPriceVolumeCurveAPI
-from .session_async import AsyncSession
+from enappsys.services_async.bulk import AsyncBulkAPI
+from enappsys.services_async.chart import AsyncChartAPI
+from enappsys.services_async.price_volume_curve import AsyncPriceVolumeCurveAPI
+from enappsys.session_async import AsyncSession
 
 
 class EnAppSysAsync:
@@ -13,7 +10,8 @@ class EnAppSysAsync:
         user: str | None = None,
         secret: str | None = None,
         credentials_file: str | None = None,
-        max_retries: int = 3
+        max_retries: int = 3,
+        agent_id: str | None = None,
     ):
         """Client for the EnAppSys API.
 
@@ -26,12 +24,14 @@ class EnAppSysAsync:
         credentials_file: str | None, optional
             Specify path to the credentials file to have it at another place
             than ~/.enappsys/api_credentials.json
-        profile_name : str | None, optional
-            Specify the profile name to load credentials from. If it is not found,
-            the ``default`` profile name will be used.
+        max_retries : int, default=3
+            Maximum number of retry attempts for failed HTTP requests.
+        agent_id : str | None, optional
+            Optional agent identifier to include in the User-Agent header.
+        
         """
         self._session = AsyncSession(
-            user, secret, credentials_file, max_retries
+            user, secret, credentials_file, max_retries, agent_id
         )
 
         # --- Public members ---

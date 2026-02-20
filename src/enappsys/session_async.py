@@ -5,34 +5,38 @@ import logging
 import os
 import time
 
-from typing import Dict, Optional, Union
-
-from .credentials import Credentials
-from .exceptions import (
+from enappsys import __version__
+from enappsys.config import RATE_LIMIT_DELAY, STATUS_FORCELIST, BACKOFF_FACTOR
+from enappsys.credentials import Credentials
+from enappsys.exceptions import (
     HTTPError,
     ContentTooLarge,
     InternalServerError,
     InvalidCredentials,
 )
-from .services.base import APIBase
+from enappsys.services.base import APIBase
 
-log = logging.getLogger(__name__)
-
-BACKOFF_FACTOR = 0.5
-RATE_LIMIT_DELAY = 0.5
-STATUS_FORCELIST = (429, 500, 502, 503, 504)
+logger = logging.getLogger(__name__)
 
 
 class AsyncSession:
-    def __init__(self, user, secret, credentials_file, max_retries):
+    def __init__(self, user, secret, credentials_file, max_retries, agent_id):
         self._credentials = Credentials(user, secret, credentials_file)
         self.session = aiohttp.ClientSession()
+
+        self.session.headers.update({
+            "User-Agent": f"enappsys-python-client/{__version__}",
+        })
+
+        if agent_id:
+            self.session.headers["User-Agent"] += f"/{agent_id}"
+
         app_env = os.getenv("APP_ENV", "app")
         self.app_env = APIBase._get_app_env(app_env)
         self.max_retries = max_retries
         self._rate_limiter = AsyncRateLimiter(RATE_LIMIT_DELAY) if RATE_LIMIT_DELAY else None
 
-    async def get(self, url: str, params: Optional[Dict] = None):
+    async def get(self, url: str, params: dict | None = None):
         full_url = f"{self.app_env}/{url}"
         params = params or {}
         params.update(self._credentials.api_format)
@@ -43,7 +47,7 @@ class AsyncSession:
             t0 = time.perf_counter()
             task = asyncio.current_task()
             task_name = task.get_name() if task else "task-unknown"
-            log.debug("http_start name=%s attempt=%d url=%s start=%s end=%s",
+            logger.debug("http_start name=%s attempt=%d url=%s start=%s end=%s",
                     task_name, attempt + 1, full_url, params.get("start"), params.get("end"))
             try:
                 if self._rate_limiter:
@@ -55,7 +59,7 @@ class AsyncSession:
                         raise ContentTooLarge
                     text = await response.text()
                     elapsed = time.perf_counter() - t0
-                    log.debug("http_done name=%s attempt=%d status=%d elapsed=%.3fs",
+                    logger.debug("http_done name=%s attempt=%d status=%d elapsed=%.3fs",
                             task_name, attempt + 1, status, elapsed)
                     if status == 200:
                         return self._decode(content_type, text)
@@ -74,7 +78,7 @@ class AsyncSession:
                 raise err
 
             delay = self._compute_backoff(attempt)
-            log.debug("http_retry name=%s exc=%r attempt=%d delay=%.3fs", task_name, err, attempt + 1, delay)
+            logger.debug("http_retry name=%s exc=%r attempt=%d delay=%.3fs", task_name, err, attempt + 1, delay)
             await asyncio.sleep(delay)
             attempt += 1
 

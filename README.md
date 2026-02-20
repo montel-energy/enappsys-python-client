@@ -1,19 +1,19 @@
 # EnAppSys Python Client
 
-The Python library for the [EnAppSys](https://app.enappsys.com) platform provides a light-weight Python client to interact with EnAppSys' API services. Additionally, there is an asynchronous client for non-blocking operations.
+The Python library for the [EnAppSys](https://app.enappsys.com) platform provides a light-weight, typed Python client to interact with EnAppSys' API services. Additionally, there is an asynchronous client for non-blocking operations.
 
 ## Installation
 
-Supports Python 3.7+.
+Supports Python 3.10+
 
 ```bash
-pip install enappsys[async,pandas]
+pip install enappsys[pandas,async]
 ```
 
 The extras are optional:
 
-- `async` required for using the `EnAppSysAsync` asynchronous client.
 - `pandas` required for converting API responses to DataFrames, e.g. via `client_response.to_df()`
+- `async` required for using the `EnAppSysAsync` asynchronous client.
 
 If you only need the synchronous client and raw responses, install without extras:
 
@@ -67,17 +67,137 @@ The client looks for credentials in the following order:
     client = EnAppSys(credentials_file="path/to/credentials.json")
     ```
 
+## Usage
 
-### Development
+The EnAppSys client provides several download interfaces, depending on your user permissions.
 
-Install in editable mode:
+### Bulk API
 
-```bash
-python -m pip install -e .[dev]
+The Bulk API is a subscription service that allows you to retrieve time series data.
+A **data type** represents a group of related series, and each individual series within that group is referred to as an **entity**.
+
+The web interface for browsing available data types and entities is available at:
+[https://app.enappsys.com/#dataservicecsv](https://app.enappsys.com/#dataservicecsv)
+
+Retrieve the `DA_PRICE` and `DA_VOLUME` entities belonging to `EPEX_HR_AUCTION_RESULTS_DE` and convert them to a pandas `DataFrame`. When converting to a `DataFrame`, you can also rename the columns:
+
+```python
+day_ahead = client.bulk.get(
+    "csv",
+    data_type="EPEX_HR_AUCTION_RESULTS_DE",
+    entities=["DA_PRICE", "DA_VOLUME"],
+    start_dt="2025-01-01T00:00",
+    end_dt="2025-01-02T00:00",
+    resolution="qh",
+    time_zone="CET",
+)
+
+df = day_ahead.to_df(rename_columns=["price", "volume"])
 ```
 
-Install the commit hooks:
+To retrieve **all entities** for a given `data_type`, omit the `entities` argument or pass `None`:
 
-```bash
-pre-commit install
+```python
+day_ahead_all = client.bulk.get(
+    "csv",
+    data_type="EPEX_HR_AUCTION_RESULTS_DE",
+    start_dt="2025-01-01T00:00",
+    end_dt="2025-01-02T00:00",
+    resolution="qh",
+    time_zone="CET",
+)
+
+df_all = day_ahead_all.to_df()
 ```
+
+The Bulk API supports multiple response formats:
+
+- `"csv"`
+- `"json"`
+- `"json_map"`
+- `"xml"`
+
+The JSON-based formats optionally include metadata fields:
+
+- `timestamp`: Indicates when the data was first entered into the database or created as a forecast (UTC).
+- `last_updated`: Indicates the last time the data was updated in the database (UTC).
+
+These fields can be included when converting the response to a DataFrame:
+
+```python
+data = client.bulk.get(
+    "json",
+    data_type="EPEX_HR_AUCTION_RESULTS_DE",
+    start_dt="2025-01-01T00:00",
+    end_dt="2025-01-02T00:00",
+    resolution="qh",
+    time_zone="CET",
+)
+
+df = data.to_df(timestamp=True, last_updated=True)
+```
+
+### Chart API
+
+The Chart API extracts data directly from charts available on the EnAppSys platform.
+
+Each chart is identified by a **code**, which can be found in the page URL.
+For example:
+
+```
+https://app.enappsys.com/#de/elec/pricing/daprices/chart
+```
+
+The chart code is the part between `#` and `/chart`, in this case:
+
+```
+de/elec/pricing/daprices
+```
+
+Example usage:
+
+```python
+day_ahead_chart = client.chart.get(
+    "csv",
+    code="de/elec/pricing/daprices",
+    start_dt="2025-01-01T00:00",
+    end_dt="2025-01-02T00:00",
+    resolution="qh",
+    time_zone="CET",
+)
+
+df_day_ahead_chart = day_ahead_chart.to_df()
+```
+
+> **Note**
+> Some charts contain non-timeseries data and may have a different structure.
+> Below chart types are supported. If you encounter a chart that is not yet supported, please open an issue and include a link to the chart.
+
+### Price Volume Curves
+
+The Price Volume Curve API retrieves auction price-volume curve data for a given timestamp.
+
+```python
+hu_price_volume_curve = client.price_volume_curve.get(
+    "csv",
+    code="hu/elec/ancillary/capacity/afrr/daily/up",
+    dt="2025-01-01T00:00",
+    time_zone="CET",
+    currency="EUR",
+)
+
+df_curve = hu_price_volume_curve.to_df()
+```
+
+The `dt` parameter represents the auction timestamp for which the curve should be retrieved.
+
+## Asynchronous
+
+An asynchronous client (`EnAppSysAsync`) is available for non-blocking and concurrent request execution.
+
+The asynchronous interface is currently under active development.
+Usage examples and extended documentation will be added in a future release.
+
+## License
+
+This project is licensed under the terms of the MIT license.

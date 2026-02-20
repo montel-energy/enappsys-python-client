@@ -3,11 +3,10 @@ from __future__ import annotations
 import asyncio
 import copy
 
-from datetime import timedelta
-from typing import Union
+from datetime import datetime
 
-from ..enum import ResolutionEnum
-from ..services.base import APIBase
+from enappsys.enum import ResolutionEnum
+from enappsys.services.base import APIBase
 
 
 class APIBaseAsync(APIBase):
@@ -15,8 +14,8 @@ class APIBaseAsync(APIBase):
         self,
         url,
         params,
-        start_dt: Union[str, "datetime"],
-        end_dt: Union[str, "datetime"],
+        start_dt: str | datetime,
+        end_dt: str | datetime,
         resolution: ResolutionEnum,
         chunk_rows: int | None = None,
     ):

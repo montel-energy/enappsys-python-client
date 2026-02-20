@@ -6,10 +6,10 @@ async def main():
     async with EnAppSysAsync() as client:
         df = await client.price_volume_curve.get_multiple(
             'csv',
-            code='hu/elec/ancillary/capacity/afrr/daily/up',
+            code='hu/elec/hupx/curves/da/hr',
             start_dt='2025-01-01T00:00',
             end_dt='2025-01-03T00:00',
-            product="15min",
+            product="1h",
             time_zone='CET',
             currency='EUR',
         )

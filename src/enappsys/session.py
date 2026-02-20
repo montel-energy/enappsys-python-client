@@ -7,24 +7,29 @@ import time
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from .credentials import Credentials
-from .exceptions import (
+from enappsys import __version__
+from enappsys.config import RATE_LIMIT_DELAY, STATUS_FORCELIST, BACKOFF_FACTOR
+from enappsys.credentials import Credentials
+from enappsys.exceptions import (
     HTTPError,
     ContentTooLarge,
-    InternalServerError,
     InvalidCredentials,
 )
-from .services.base import APIBase
-
-BACKOFF_FACTOR = 0.5
-RATE_LIMIT_DELAY = 0.5
-STATUS_FORCELIST = (429, 500, 502, 503, 504)
+from enappsys.services.base import APIBase
 
 
 class Session:
-    def __init__(self, user, secret, credentials_file, max_retries):
+    def __init__(self, user, secret, credentials_file, max_retries, agent_id):
         self._credentials = Credentials(user, secret, credentials_file)
         self.session = requests.Session()
+
+        self.session.headers.update({
+            "User-Agent": f"enappsys-python-client/{__version__}",
+        })
+
+        if agent_id:
+            self.session.headers["User-Agent"] += f"/{agent_id}"
+
         app_env = os.getenv("APP_ENV", "app")
         self.app_env = APIBase._get_app_env(app_env)
         self._rate_limiter = RateLimiter(RATE_LIMIT_DELAY) if RATE_LIMIT_DELAY else None

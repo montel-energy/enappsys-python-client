@@ -4,18 +4,18 @@ import io
 import logging
 
 from datetime import datetime
-from typing import Any, Dict, Literal, overload, TYPE_CHECKING, Union
+from typing import Literal, overload, TYPE_CHECKING
 
-from .base import APIBase, JSONBase, JSONMapBase
-from ..enum import (
+from enappsys.enum import (
     CurrencyEnum,
     DelimiterEnum,
     ResponseFormatEnum,
     ResolutionEnum,
     TimeZoneEnum,
 )
-from ..exceptions import ContentTooLarge
-from ..utils import validate_rename_columns_length
+from enappsys.exceptions import ContentTooLarge
+from enappsys.services.base import APIBase, JSONBase, JSONMapBase
+from enappsys.utils import validate_rename_columns_length
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -157,70 +157,70 @@ class ChartAPI(APIBase):
     @overload
     def get(
         self,
-        response_format: Literal["csv", ResponseFormatEnum.CSV],
+        response_format: Literal["csv"] | ResponseFormatEnum.CSV,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
         min_avg_max: bool,
-        delimiter: DelimiterEnum = "comma",
+        delimiter: str | DelimiterEnum = "comma",
     ) -> ChartCSV: ...
 
     @overload
     def get(
         self,
-        response_format: Literal["json", ResponseFormatEnum.JSON],
+        response_format: Literal["json"] | ResponseFormatEnum.JSON,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
         min_avg_max: bool,
     ) -> ChartJSON: ...
 
     @overload
     def get(
         self,
-        response_format: Literal["json_map", ResponseFormatEnum.JSON_MAP],
+        response_format: Literal["json_map"] | ResponseFormatEnum.JSON_MAP,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
         min_avg_max: bool,
     ) -> ChartJSONMap: ...
 
     @overload
     def get(
         self,
-        response_format: Literal["xml", ResponseFormatEnum.XML],
+        response_format: Literal["xml"] | ResponseFormatEnum.XML,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum,
-        currency: CurrencyEnum,
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum,
+        currency: str | CurrencyEnum,
         min_avg_max: bool,
     ) -> ChartXML: ...
 
     def get(
         self,
-        response_format: ResponseFormatEnum,
+        response_format: Literal["csv", "json", "json_map", "xml"] | ResponseFormatEnum,
         code: str,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
-        time_zone: TimeZoneEnum = "UTC",
-        currency: CurrencyEnum = "EUR",
+        start_dt: str | datetime,
+        end_dt: str | datetime,
+        resolution: str | ResolutionEnum,
+        time_zone: str | TimeZoneEnum = "UTC",
+        currency: str | CurrencyEnum = "EUR",
         min_avg_max: bool = False,
-        delimiter: DelimiterEnum = "comma",
-    ) -> Union[ChartCSV, ChartJSON, ChartJSONMap, ChartXML]:
+        delimiter: str | DelimiterEnum = "comma",
+    ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
         response_format_enum = self._get_response_format(response_format)
-        params: Dict[str, Any] = {}
+        params = {}
         self._add_code(params, code)
         self._add_dt(params, start_dt, "start", "start_dt")
         self._add_dt(params, end_dt, "end", "end_dt")
@@ -237,7 +237,7 @@ class ChartAPI(APIBase):
             response = self._session.get(url, params)
         except ContentTooLarge as e:
             chunks = self._get_in_chunks(url, params, start_dt, end_dt, resolution)
-            pass
+            response = self._assemble_chunks(chunks, response_format_enum.platform)
 
         chart_class = self._RESPONSE_FORMAT_MAP.get(response_format_enum)
 

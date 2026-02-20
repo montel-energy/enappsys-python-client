@@ -4,9 +4,9 @@ import copy
 import logging
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
-from ..enum import (
+from enappsys.enum import (
     AppEnvEnum,
     CurrencyEnum,
     DelimiterEnum,
@@ -14,12 +14,12 @@ from ..enum import (
     ResponseFormatEnum,
     TimeZoneEnum,
 )
-from ..exceptions import ValidationError
-from ..utils import dt_series_format
+from enappsys.exceptions import ValidationError
+from enappsys.utils import dt_series_format
 
 if TYPE_CHECKING:
     import pandas as pd
-    from ..client import EnAppSys
+    from enappsys import EnAppSys
 
 logger = logging.getLogger(__name__)
 
@@ -32,30 +32,30 @@ class APIBase:
         self._session = client._session
 
     @staticmethod
-    def _get_app_env(app_env: Union[str, AppEnvEnum]) -> AppEnvEnum:
+    def _get_app_env(app_env: str | AppEnvEnum) -> AppEnvEnum:
         return AppEnvEnum._from_value(app_env).app_env_url
 
     @staticmethod
     def _get_response_format(
-        response_format: Union[str, ResponseFormatEnum],
+        response_format: str | ResponseFormatEnum,
     ) -> ResponseFormatEnum:
         return ResponseFormatEnum._from_value(response_format)
 
     @staticmethod
     def _add_resolution(
-        params, resolution: Union[str, ResolutionEnum], api_name: str = "res"
+        params, resolution: str | ResolutionEnum, api_name: str = "res"
     ):
         params[api_name] = ResolutionEnum._from_value(resolution).platform
 
     @staticmethod
     def _add_time_zone(
-        params, time_zone: Union[str, TimeZoneEnum], api_name: str = "timezone"
+        params, time_zone: str | TimeZoneEnum, api_name: str = "timezone"
     ):
         params[api_name] = TimeZoneEnum._from_value(time_zone).platform
 
     @staticmethod
     def _add_currency(
-        params, currency: Union[str, CurrencyEnum], api_name: str = "currency"
+        params, currency: str | CurrencyEnum, api_name: str = "currency"
     ):
         params[api_name] = CurrencyEnum._from_value(currency).platform
 
@@ -67,13 +67,19 @@ class APIBase:
             raise ValidationError(reason="Provide a valid str", parameter="data_type")
 
     @staticmethod
-    def _add_entities(params, entities: Union[str, list], api_name: str = "entities"):
-        if isinstance(entities, str):
-            params[api_name] = [entities]
-        elif isinstance(entities, list):
+    def _add_entities(params, entities: list[str] | None, api_name: str = "entities"):
+        if entities is None:
+            params[api_name] = ["ALL"]
+            return
+
+        if isinstance(entities, list) and all(isinstance(e, str) for e in entities):
             params[api_name] = entities
-        else:
-            raise ValidationError(reason="Provide a valid list", parameter="entities")
+            return
+
+        raise ValidationError(
+            reason="Provide a list of strings or None.",
+            parameter="entities",
+        )
 
     @staticmethod
     def _add_code(params, code: str, api_name: str = "code"):
@@ -83,7 +89,7 @@ class APIBase:
             raise ValidationError(reason="Provide a valid str", parameter="code")
 
     @staticmethod
-    def _add_dt(params, dt: Union[datetime, str], api_name: str, client_name: str) -> datetime:
+    def _add_dt(params, dt: datetime | str, api_name: str, client_name: str) -> datetime:
         """Add datetime to params and return the datetime object."""
         dt_obj = APIBase._get_dt(dt, client_name)
         params[api_name] = dt_obj.strftime("%Y%m%d%H%M")
@@ -99,7 +105,7 @@ class APIBase:
     @staticmethod
     def _add_delimiter(
         params,
-        delimiter: Union[str, DelimiterEnum],
+        delimiter: str | DelimiterEnum,
         response_format_enum: ResponseFormatEnum,
         api_name: str = "delimiter",
     ):
@@ -107,7 +113,7 @@ class APIBase:
             params[api_name] = DelimiterEnum._from_value(delimiter).platform
 
     @staticmethod
-    def _get_dt(dt: Union[datetime, str], client_name: str) -> datetime:
+    def _get_dt(dt: datetime | str, client_name: str) -> datetime:
         """Convert datetime or string to datetime object.
         
         Parameters
@@ -142,9 +148,9 @@ class APIBase:
         self,
         url,
         params,
-        start_dt: Union[datetime, str],
-        end_dt: Union[datetime, str],
-        resolution: ResolutionEnum,
+        start_dt: datetime | str,
+        end_dt: datetime | str,
+        resolution: str | ResolutionEnum,
     ):
         start_dt_obj = self._get_dt(start_dt, "start_dt")
         end_dt_obj = self._get_dt(end_dt, "end_dt")

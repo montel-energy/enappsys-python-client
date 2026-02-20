@@ -1,15 +1,14 @@
 from datetime import timedelta
 from enum import Enum
-from typing import Union
 
-from .exceptions import ValidationError
+from enappsys.exceptions import ValidationError
 
 
 class BaseEnum(Enum):
     """Base Enum that resolves a member by matching any of its public attributes."""
 
     @classmethod
-    def _from_value(cls, value: Union[str, int, float, bool, Enum, object]):
+    def _from_value(cls, value: str | int | float | bool | Enum | object):
         """Return the Enum member matching any of its public attribute values.
 
         Accepts either:

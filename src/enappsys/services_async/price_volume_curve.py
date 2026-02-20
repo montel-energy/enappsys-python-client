@@ -3,16 +3,16 @@ from __future__ import annotations
 import asyncio
 
 from datetime import datetime
-from typing import Any, Dict, Literal, overload, TYPE_CHECKING, Union
+from typing import Literal, overload, TYPE_CHECKING
 
-from .base import APIBaseAsync
-from ..services.price_volume_curve import PriceVolumeCurveCSV, PriceVolumeCurveXML
-from ..enum import (
+from enappsys.enum import (
     CurrencyEnum,
     DelimiterEnum,
     ResponseFormatEnum,
     TimeZoneEnum,
 )
+from enappsys.services_async.base import APIBaseAsync
+from enappsys.services.price_volume_curve import PriceVolumeCurveCSV, PriceVolumeCurveXML
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -27,9 +27,9 @@ class AsyncPriceVolumeCurveAPI(APIBaseAsync):
     @overload
     async def get(
         self,
-        response_format: Literal["csv", ResponseFormatEnum.CSV],
+        response_format: Literal["csv"] | ResponseFormatEnum.CSV,
         code: str,
-        dt: Union[datetime, str],
+        dt: str | datetime,
         time_zone: TimeZoneEnum,
         currency: CurrencyEnum,
         delimiter: DelimiterEnum = "comma",
@@ -38,24 +38,24 @@ class AsyncPriceVolumeCurveAPI(APIBaseAsync):
     @overload
     async def get(
         self,
-        response_format: Literal["xml", ResponseFormatEnum.XML],
+        response_format: Literal["xml"] | ResponseFormatEnum.XML,
         code: str,
-        dt: Union[datetime, str],
+        dt: str | datetime,
         time_zone: TimeZoneEnum,
         currency: CurrencyEnum,
     ) -> PriceVolumeCurveXML: ...
 
     async def get(
         self,
-        response_format: Union[str, ResponseFormatEnum],
+        response_format: Literal["csv", "xml"] | ResponseFormatEnum,
         code: str,
-        dt: Union[datetime, str],
+        dt: str | datetime,
         time_zone: TimeZoneEnum,
         currency: CurrencyEnum,
         delimiter: DelimiterEnum = "comma",
-    ) -> Union[PriceVolumeCurveCSV, PriceVolumeCurveXML]:
+    ) -> PriceVolumeCurveCSV | PriceVolumeCurveXML:
         response_format = self._get_response_format(response_format)
-        params: Dict[str, Any] = {}
+        params = {}
         self._add_code(params, code)
         self._add_dt(params, dt, "minperiod", "dt")
         self._add_time_zone(params, time_zone)
@@ -81,7 +81,7 @@ class AsyncPriceVolumeCurveAPI(APIBaseAsync):
 
     async def get_multiple(
         self,
-        response_format: str,
+        response_format: Literal["csv", "xml"] | ResponseFormatEnum,
         code: str,
         start_dt: str,
         end_dt: str,
