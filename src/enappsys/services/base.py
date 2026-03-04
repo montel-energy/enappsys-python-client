@@ -156,7 +156,7 @@ class APIBase:
         end_dt_obj = self._get_dt(end_dt, "end_dt")
         
         data_chunks = []
-        delta = timedelta(**ResolutionEnum._from_value(resolution).delta)
+        delta = ResolutionEnum._from_value(resolution).delta
         chunk_params = copy.deepcopy(params)
         chunk_start_dt = copy.deepcopy(start_dt_obj)  # Now guaranteed to be datetime
         

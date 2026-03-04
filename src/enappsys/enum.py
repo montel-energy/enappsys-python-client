@@ -67,6 +67,7 @@ class ResolutionEnum(BaseEnum):
     """Supported temporal resolutions with platform, ISO 8601, pandas and timedelta."""
 
     PT1S = ("1s", "PT1S", "s", timedelta(seconds=1))
+    PT4S = ("4s", "PT4S", "4s", timedelta(seconds=4))
     PT15S = ("15s", "PT15S", "15s", timedelta(seconds=15))
     PT1M = ("min", "PT1M", "min", timedelta(minutes=1))
     PT5M = ("5min", "PT5M", "5min", timedelta(minutes=5))
