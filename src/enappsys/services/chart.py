@@ -15,7 +15,7 @@ from enappsys.enum import (
 )
 from enappsys.exceptions import ContentTooLarge
 from enappsys.services.base import APIBase, JSONBase, JSONMapBase
-from enappsys.utils import validate_rename_columns_length
+from enappsys.utils import validate_rename_columns_length, require_pandas
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -79,7 +79,7 @@ class ChartCSV(ChartBase):
         pandas.DataFrame
             Processed API response formatted as a `pandas.DataFrame`.
         """
-        import pandas as pd
+        pd = require_pandas()
 
         # TODO: Determine to include seconds manually
         df = pd.read_csv(

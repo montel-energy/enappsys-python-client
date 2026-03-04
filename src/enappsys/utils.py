@@ -6,7 +6,7 @@ def dt_series_format(
     convert: bool = False,
     tz_convert: str | None = None,
 ):
-    import pandas as pd
+    pd = require_pandas()
 
     dt_series = pd.to_datetime(dt_series, format=dt_format)
     if localize:
@@ -14,6 +14,26 @@ def dt_series_format(
     if convert:
         dt_series = dt_series.dt.tz_convert(tz_convert)
     return dt_series
+
+
+def require_aiohttp():
+    try:
+        import aiohttp
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            "Async support requires aiohttp. Install with: pip install enappsys[async]"
+        ) from e
+    return aiohttp
+
+
+def require_pandas():
+    try:
+        import pandas as pd
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            "This feature requires pandas. Install with: pip install enappsys[pandas]"
+        ) from e
+    return pd
 
 
 def validate_rename_columns_length(rename_columns: list, columns, step_size):

@@ -12,7 +12,7 @@ from enappsys.enum import (
     TimeZoneEnum,
 )
 from enappsys.services.base import APIBase
-from enappsys.utils import validate_rename_columns_length
+from enappsys.utils import validate_rename_columns_length, require_pandas
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -68,7 +68,7 @@ class PriceVolumeCurveCSV(PriceVolumeCurveBase):
         pandas.DataFrame
             Processed API response formatted as a `pandas.DataFrame`.
         """
-        import pandas as pd
+        pd = require_pandas()
 
         df = pd.read_csv(
             io.StringIO(self.response),

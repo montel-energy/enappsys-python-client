@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from enappsys.enum import (
@@ -15,7 +15,7 @@ from enappsys.enum import (
     TimeZoneEnum,
 )
 from enappsys.exceptions import ValidationError
-from enappsys.utils import dt_series_format
+from enappsys.utils import dt_series_format, require_pandas
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -236,7 +236,7 @@ class JSONBase:
         ``pandas.DataFrame``
             ``json`` response type processed into a ``pandas.DataFrame``
         """
-        import pandas as pd
+        pd = require_pandas()
 
         columns = []
         if timestamp:
@@ -367,7 +367,7 @@ class JSONMapBase:
         ``pandas.DataFrame``
             ``json_map`` response type processed into a ``pandas.DataFrame``
         """
-        import pandas as pd
+        pd = require_pandas()
 
         df_map = pd.DataFrame.from_dict(self.response["data"], orient="index")
         df_map.index = pd.to_datetime(df_map.index, format="%Y-%m-%dT%H:%M:%S")

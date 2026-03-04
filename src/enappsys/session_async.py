@@ -1,4 +1,3 @@
-import aiohttp
 import asyncio
 import json
 import logging
@@ -15,12 +14,15 @@ from enappsys.exceptions import (
     InvalidCredentials,
 )
 from enappsys.services.base import APIBase
+from enappsys.utils import require_aiohttp
 
 logger = logging.getLogger(__name__)
 
 
 class AsyncSession:
     def __init__(self, user, secret, credentials_file, max_retries, agent_id):
+        aiohttp = require_aiohttp()
+
         self._credentials = Credentials(user, secret, credentials_file)
         self.session = aiohttp.ClientSession()
 

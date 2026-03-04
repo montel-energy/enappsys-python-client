@@ -13,6 +13,7 @@ from enappsys.enum import (
 )
 from enappsys.services_async.base import APIBaseAsync
 from enappsys.services.price_volume_curve import PriceVolumeCurveCSV, PriceVolumeCurveXML
+from enappsys.utils import require_pandas
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -92,7 +93,8 @@ class AsyncPriceVolumeCurveAPI(APIBaseAsync):
         unit_in_columns: bool = False,
     ) -> pd.DataFrame:
         """Fetch multiple price-volume curves concurrently and process into a DataFrame."""
-        import pandas as pd
+        pd = require_pandas()
+        
         dt_range = pd.date_range(start=start_dt, end=end_dt, freq=product, inclusive="left")
 
         async def fetch_one(dt):

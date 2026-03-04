@@ -2,7 +2,6 @@
 Pytest fixtures for EnAppSys testing, using yield for setup and teardown logic.
 """
 
-import asyncio
 import pandas as pd
 import pytest_asyncio
 import pytest
