@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 
 class AsyncSession:
     def __init__(self, user, secret, credentials_file, max_retries, agent_id):
-        aiohttp = require_aiohttp()
+        self._aiohttp = require_aiohttp()
 
         self._credentials = Credentials(user, secret, credentials_file)
-        self.session = aiohttp.ClientSession()
+        self.session = self._aiohttp.ClientSession()
 
         self.session.headers.update({
             "User-Agent": f"enappsys-python-client/{__version__}",
@@ -71,7 +71,7 @@ class AsyncSession:
                         raise HTTPError(f"Retryable HTTP {status}: {text}")
                     raise HTTPError(f"Unexpected HTTP {status}: {text}")
 
-            except (aiohttp.ClientError, asyncio.TimeoutError, HTTPError, InternalServerError) as e:
+            except (self._aiohttp.ClientError, asyncio.TimeoutError, HTTPError, InternalServerError) as e:
                 err = HTTPError(e)
             except (HTTPError, InternalServerError) as e:
                 err = e
