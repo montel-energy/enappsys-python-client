@@ -1,5 +1,6 @@
 from enappsys.services_async.bulk import AsyncBulkAPI
 from enappsys.services_async.chart import AsyncChartAPI
+from enappsys.services_async.epex import AsyncEpexAPI
 from enappsys.services_async.price_volume_curve import AsyncPriceVolumeCurveAPI
 from enappsys.session_async import AsyncSession
 
@@ -53,6 +54,14 @@ class EnAppSysAsync:
         An instance of :class:`PriceVolumeCurveAPI`.
         
         Provides the interface for retrieving price volume curve data.
+        """
+
+        self.epex = AsyncEpexAPI(self)
+        """
+        An instance of :class:`AsyncEpexAPI`.
+
+        Provides access to the APX download endpoint for EPEX contract
+        and settlement data.
         """
 
     async def aclose(self) -> None:

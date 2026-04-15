@@ -1,5 +1,6 @@
 from enappsys.services.bulk import BulkAPI
 from enappsys.services.chart import ChartAPI
+from enappsys.services.epex import EpexAPI
 from enappsys.services.price_volume_curve import PriceVolumeCurveAPI
 from enappsys.session import Session
 
@@ -60,6 +61,14 @@ class EnAppSys:
         
         Provides access to the Price Volume Curve API for retrieving 
         price volume curves from charts.
+        """
+
+        self.epex = EpexAPI(self)
+        """
+        An instance of :class:`EpexAPI`.
+
+        Provides access to the APX download endpoint for EPEX contract
+        and settlement data.
         """
 
     def close(self) -> None:

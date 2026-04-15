@@ -175,7 +175,7 @@ day_ahead_chart = client.chart.get(
 df_day_ahead_chart = day_ahead_chart.to_df()
 ```
 
-> **Note**
+> [!NOTE]
 > Some charts contain non-timeseries data and may have a different structure.
 > Below chart types are supported. If you encounter a chart that is not yet supported, please open an issue and include a link to the chart.
 
@@ -196,6 +196,41 @@ df_curve = hu_price_volume_curve.to_df()
 ```
 
 The `dt` parameter represents the auction timestamp for which the curve should be retrieved.
+
+### EPEX Trade Evolution And Contracts
+
+The EPEX service uses the `apxdownload` endpoint and is exposed as `client.epex`. It currently supports settlement trade evolution downloads and contract evolution downloads in `"csv"`, `"json"`, and `"xml"` formats.
+
+Settlement trade evolution is available under `client.epex.settlement`. You can identify a quarter-hour either with `settlement_date` plus `settlement_period`, or with a single `settlement_datetime`:
+
+```python
+trade_evo = client.epex.settlement.get(
+    "csv",
+    code="nl/elec/epex/tradeevo/download",
+    settlement_datetime="2025-01-01T12:07",
+    max_points=200,
+    time_zone="CET",
+)
+
+trade_evo_df = trade_evo.to_df(
+    rename_columns=["qh_price", "qh_vol", "hh_price", "hh_vol", "hr_price", "hr_vol"],
+    unit_in_columns=True,
+)
+```
+
+Contract evolution is available under `client.epex.contract`:
+
+```python
+contract_evo = client.epex.contract.get(
+    "csv",
+    code="nl/elec/spectron/power/baseload/evolution/download",
+    contract="DEC-25",
+    max_points="all",
+    time_zone="CET",
+)
+
+contract_evo_df = contract_evo.to_df(unit_in_columns=True)
+```
 
 ## Asynchronous
 
