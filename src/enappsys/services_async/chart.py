@@ -113,7 +113,7 @@ class AsyncChartAPI(APIBaseAsync):
         chart_class = self._RESPONSE_FORMAT_MAP[response_format]
         return chart_class(
             response,
-            url,
+            self._session.build_url(url),
             params,
             response_format,
             code,

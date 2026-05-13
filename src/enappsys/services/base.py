@@ -23,6 +23,26 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+def _warn_empty_response(
+    response_format: str,
+    url: str | None = None,
+    params: dict | None = None,
+) -> None:
+    details = []
+    if url:
+        details.append(f"url={url}")
+    if params:
+        request_params = params.copy()
+        request_params.pop("user", None)
+        request_params.pop("pass", None)
+        details.append(f"params={request_params}")
+
+    context = f" ({'; '.join(details)})" if details else ""
+    logger.warning(
+        f"No data returned for {response_format} response; "
+        f"returning empty DataFrame.{context}"
+    )
+
 
 class APIBase:
     API_MAX_ROWS = 150000
@@ -249,6 +269,10 @@ class JSONBase:
             columns += ["value"]
 
         df_records = pd.DataFrame(self.response["data"])
+        if df_records.empty:
+            _warn_empty_response("json", url=self.url, params=self.params)
+            return df_records
+
         df_records = df_records.set_index("dateTime", drop=True)
         df_records.index = pd.to_datetime(df_records.index, format="%Y-%m-%dT%H:%M:%S")
         if tz_localize:
@@ -370,6 +394,11 @@ class JSONMapBase:
         pd = require_pandas()
 
         df_map = pd.DataFrame.from_dict(self.response["data"], orient="index")
+        if df_map.empty:
+            _warn_empty_response("json_map", url=self.url, params=self.params)
+            df_map.index.name = "dateTime"
+            return df_map
+
         df_map.index = pd.to_datetime(df_map.index, format="%Y-%m-%dT%H:%M:%S")
         if tz_localize:
             df_map.index = df_map.index.tz_localize(self.time_zone, ambiguous="infer")

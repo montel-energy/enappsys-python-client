@@ -12,7 +12,7 @@ from enappsys.enum import (
     TimeZoneEnum,
 )
 from enappsys.exceptions import ContentTooLarge
-from enappsys.services.base import APIBase, JSONBase, JSONMapBase
+from enappsys.services.base import APIBase, JSONBase, JSONMapBase, _warn_empty_response
 from enappsys.utils import validate_rename_columns_length, require_pandas
 
 if TYPE_CHECKING:
@@ -85,13 +85,24 @@ class BulkCSV(BulkBase):
         pd = require_pandas()
 
         # TODO: Determine to include seconds manually
-        df = pd.read_csv(
-            io.StringIO(self.response),
-            index_col=0,
-            parse_dates=True,
-            date_format="%d/%m/%Y %H:%M",
-        )
+        try:
+            df = pd.read_csv(
+                io.StringIO(self.response),
+                index_col=0,
+                parse_dates=True,
+                date_format="%d/%m/%Y %H:%M",
+            )
+        except pd.errors.EmptyDataError:
+            _warn_empty_response("csv", url=self.url, params=self.params)
+            return pd.DataFrame()
+
         df.index.name = "dateTime"
+        if df.empty:
+            _warn_empty_response("csv", url=self.url, params=self.params)
+            if remove_units_column and len(df.columns) > 0:
+                df = df.iloc[:, 1:]
+            return df
+
         if tz_localize:
             df.index = df.index.tz_localize(self.time_zone, ambiguous="infer")
 
@@ -263,7 +274,7 @@ class BulkAPI(APIBase):
 
         return bulk_class(
             response,
-            url,
+            self._session.build_url(url),
             params,
             response_format,
             data_type,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import logging
 
 from datetime import datetime
 from typing import Literal, overload, TYPE_CHECKING
@@ -14,13 +13,11 @@ from enappsys.enum import (
     TimeZoneEnum,
 )
 from enappsys.exceptions import ContentTooLarge
-from enappsys.services.base import APIBase, JSONBase, JSONMapBase
+from enappsys.services.base import APIBase, JSONBase, JSONMapBase, _warn_empty_response
 from enappsys.utils import validate_rename_columns_length, require_pandas
 
 if TYPE_CHECKING:
     import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 
 class ChartBase:
@@ -89,8 +86,11 @@ class ChartCSV(ChartBase):
             parse_dates=True,
             date_format="[%d/%m/%Y %H:%M]",
         )
+
         df.index.name = "dateTime"
-        if tz_localize:
+        if df.empty:
+            _warn_empty_response("csv", url=self.url, params=self.params)
+        elif tz_localize:
             df.index = df.index.tz_localize(self.time_zone, ambiguous="infer")
 
         step_size = 1
@@ -235,7 +235,7 @@ class ChartAPI(APIBase):
 
         try:
             response = self._session.get(url, params)
-        except ContentTooLarge as e:
+        except ContentTooLarge:
             chunks = self._get_in_chunks(url, params, start_dt, end_dt, resolution)
             response = self._assemble_chunks(chunks, response_format_enum.platform)
 
@@ -243,7 +243,7 @@ class ChartAPI(APIBase):
 
         return chart_class(
             response,
-            url,
+            self._session.build_url(url),
             params,
             response_format,
             code,

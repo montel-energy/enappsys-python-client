@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import requests
 import threading
@@ -16,6 +17,8 @@ from enappsys.exceptions import (
     InvalidCredentials,
 )
 from enappsys.services.base import APIBase
+
+logger = logging.getLogger(__name__)
 
 
 class Session:
@@ -51,34 +54,51 @@ class Session:
         response: object
             Object(s) returned from a GET request
         """
-        full_url = f"{self.app_env}/{url}"
+        full_url = self.build_url(url)
 
         params = params or {}
         params.update(self._credentials.api_format)
+        request_context = f"url={full_url} params={self._safe_params(params)}"
+        logger.debug(f"GET {request_context}")
         try:
             if self._rate_limiter:
                 self._rate_limiter()
             response = self.session.get(full_url, params=params)
         except requests.exceptions.RequestException as e:
-            raise HTTPError(e)
+            raise HTTPError(
+                f"{e.__class__.__name__}: request failed for {request_context}"
+            ) from None
 
         if response.status_code == 200:
-            return self._get_response_content(response)
+            return self._get_response_content(response, request_context)
         elif response.status_code == 413:
             raise ContentTooLarge
         elif response.status_code == 401:
             raise InvalidCredentials
         else:
-            response_error = self._get_response_content(response)
-            raise HTTPError(f"Unexpected HTTP {response.status_code}: {response_error}")
+            response_error = self._get_response_content(response, request_context)
+            raise HTTPError(
+                f"Unexpected HTTP {response.status_code}: {response_error}; {request_context}"
+            )
 
-    def _get_response_content(self, response):
+    @staticmethod
+    def _safe_params(params: dict) -> dict:
+        safe_params = params.copy()
+        safe_params.pop("user", None)
+        safe_params.pop("pass", None)
+        return safe_params
+
+    def build_url(self, url: str) -> str:
+        return f"{self.app_env}/{url}"
+
+    def _get_response_content(self, response, request_context: str | None = None):
         content_type = response.headers.get("Content-Type", "")
         if "application/json" in content_type:
             try:
                 return response.json()
             except json.decoder.JSONDecodeError as e:
-                raise HTTPError(f"Failed to parse JSON response: {e}")
+                context = f"; {request_context}" if request_context else ""
+                raise HTTPError(f"Failed to parse JSON response: {e}{context}")
         else:
             return response.text
 

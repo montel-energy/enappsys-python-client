@@ -39,7 +39,7 @@ class AsyncSession:
         self._rate_limiter = AsyncRateLimiter(RATE_LIMIT_DELAY) if RATE_LIMIT_DELAY else None
 
     async def get(self, url: str, params: dict | None = None):
-        full_url = f"{self.app_env}/{url}"
+        full_url = self.build_url(url)
         params = params or {}
         params.update(self._credentials.api_format)
 
@@ -96,6 +96,9 @@ class AsyncSession:
     def _compute_backoff(attempt: int) -> float:
         retry_after = BACKOFF_FACTOR * (2 ** attempt)
         return max(retry_after, RATE_LIMIT_DELAY)
+
+    def build_url(self, url: str) -> str:
+        return f"{self.app_env}/{url}"
 
     async def close(self):
         await self.session.close()

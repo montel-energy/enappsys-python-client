@@ -111,7 +111,7 @@ class AsyncBulkAPI(APIBaseAsync):
         bulk_class = self._RESPONSE_FORMAT_MAP[response_format]
         return bulk_class(
             response,
-            url,
+            self._session.build_url(url),
             params,
             response_format,
             data_type,
