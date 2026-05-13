@@ -97,18 +97,16 @@ class BulkCSV(BulkBase):
             return pd.DataFrame()
 
         df.index.name = "dateTime"
-        if df.empty:
-            _warn_empty_response("csv", url=self.url, params=self.params)
-            if remove_units_column and len(df.columns) > 0:
-                df = df.iloc[:, 1:]
-            return df
-
-        if tz_localize:
-            df.index = df.index.tz_localize(self.time_zone, ambiguous="infer")
-
         step_size = 1
         if self.min_avg_max:
             step_size = 3
+
+        if df.empty:
+            _warn_empty_response("csv", url=self.url, params=self.params)
+            df.index = pd.DatetimeIndex([], name="dateTime")
+        
+        if tz_localize:
+            df.index = df.index.tz_localize(self.time_zone, ambiguous="infer")
 
         if rename_columns or data_type_in_columns or unit_in_columns:
             columns = list(df.columns)
@@ -117,14 +115,16 @@ class BulkCSV(BulkBase):
                 # [:1] to not include Units when comparing with rename_columns
                 validate_rename_columns_length(rename_columns, columns[1:], step_size)
 
-            # Units are in first column, for every row, so take first
-            units_colon_delimited = df.iloc[0, 0]
-            if not pd.isnull(units_colon_delimited):
-                units = units_colon_delimited.split(":")
-                if len(units) == 1:
-                    units = units * ((len(columns) - 1) // step_size)
-            else:
-                units = [""] * ((len(columns) - 1) // step_size)
+            units = None
+            if not df.empty:
+                # Units are in first column, for every row, so take first
+                units_colon_delimited = df.iloc[0, 0]
+                if not pd.isnull(units_colon_delimited):
+                    units = units_colon_delimited.split(":")
+                    if len(units) == 1:
+                        units = units * ((len(columns) - 1) // step_size)
+                else:
+                    units = [""] * ((len(columns) - 1) // step_size)
 
             # Add datatype to "Units" column
             if data_type_in_columns:
@@ -140,7 +140,7 @@ class BulkCSV(BulkBase):
                     column_name = rename_columns[column_name]
                 if data_type_in_columns:
                     column_name = f"{self.data_type}.{column_name}"
-                if unit_in_columns:
+                if unit_in_columns and units is not None:
                     column_name = f"{column_name} ({units[(idx - 1) // step_size]})"
 
                 if self.min_avg_max:

@@ -90,7 +90,8 @@ class ChartCSV(ChartBase):
         df.index.name = "dateTime"
         if df.empty:
             _warn_empty_response("csv", url=self.url, params=self.params)
-        elif tz_localize:
+            df.index = pd.DatetimeIndex([], name="dateTime")
+        if tz_localize:
             df.index = df.index.tz_localize(self.time_zone, ambiguous="infer")
 
         step_size = 1

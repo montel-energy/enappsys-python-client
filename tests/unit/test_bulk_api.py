@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 import logging
 
+import pandas as pd
+
 from enappsys.services.bulk import BulkCSV, BulkJSON, BulkJSONMap
 from enappsys.services.chart import ChartCSV, ChartJSON, ChartJSONMap
 
@@ -77,6 +79,8 @@ def test_empty_bulk_csv_to_df_returns_empty_dataframe(caplog):
         df = out.to_df()
 
     assert df.empty
+    assert isinstance(df.index, pd.DatetimeIndex)
+    assert str(df.index.tz) == "UTC"
     assert list(df.columns) == ["BE.BELGIUM"]
     assert "returning empty DataFrame" in caplog.text
     assert "url=bulk" in caplog.text
@@ -85,6 +89,33 @@ def test_empty_bulk_csv_to_df_returns_empty_dataframe(caplog):
     assert "202301010000" in caplog.text
     assert "test-user" not in caplog.text
     assert "test-secret" not in caplog.text
+
+
+def test_empty_bulk_csv_to_df_applies_rename_columns(caplog):
+    out = BulkCSV(
+        "Datetime,Units,BE.BELGIUM\n",
+        "bulk",
+        {},
+        "csv",
+        "ENTSOE_DAY_AHEAD_PRICES",
+        ["BE.BELGIUM"],
+        None,
+        None,
+        "hourly",
+        "UTC",
+        False,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        df = out.to_df(
+            data_type_in_columns=True,
+            rename_columns=["be_dap"],
+        )
+
+    assert df.empty
+    assert isinstance(df.index, pd.DatetimeIndex)
+    assert str(df.index.tz) == "UTC"
+    assert list(df.columns) == ["ENTSOE_DAY_AHEAD_PRICES.be_dap"]
 
 
 def test_bulk_empty_warning_uses_full_url(client: "EnAppSys", monkeypatch, caplog):
@@ -135,11 +166,40 @@ def test_empty_chart_csv_to_df_returns_empty_dataframe(caplog):
         df = out.to_df()
 
     assert df.empty
+    assert isinstance(df.index, pd.DatetimeIndex)
+    assert str(df.index.tz) == "UTC"
     assert list(df.columns) == ["BE.BELGIUM"]
     assert "returning empty DataFrame" in caplog.text
     assert "url=datadownload" in caplog.text
     assert "day-ahead-prices" in caplog.text
     assert "202301010300" in caplog.text
+
+
+def test_empty_chart_csv_to_df_applies_rename_columns(caplog):
+    out = ChartCSV(
+        "Datetime,BE.BELGIUM\n,EUR/MWh\n",
+        "datadownload",
+        {},
+        "csv",
+        "day-ahead-prices",
+        None,
+        None,
+        "hourly",
+        "UTC",
+        "EUR",
+        False,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        df = out.to_df(
+            rename_columns=["be_dap"],
+            unit_in_columns=True,
+        )
+
+    assert df.empty
+    assert isinstance(df.index, pd.DatetimeIndex)
+    assert str(df.index.tz) == "UTC"
+    assert list(df.columns) == ["be_dap (EUR/MWh)"]
 
 
 def test_chart_empty_warning_uses_full_url(client: "EnAppSys", monkeypatch, caplog):
