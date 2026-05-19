@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "enappsys"
 authors = [
     {name = "Silvan Murre", email = "silvan.murre@montel.energy"},
+    {name = "Andras Rozs", email = "andras.rozs@montel.energy"}
 ]
 description = """The EnAppSys Python client provides a light-weight client that allows for simple access to EnAppSys' API services."""
 readme = "README.md"
@@ -26,7 +27,8 @@ async = [
     "aiohttp"
 ]
 pandas = [
-    "pandas"
+    "pandas",
+    "tzdata",
 ]
 dev = [
     "enappsys[async]",
