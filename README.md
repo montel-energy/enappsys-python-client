@@ -1,5 +1,7 @@
 <picture align="center">
-  <img alt="EnAppSys" src="docs/assets/enappsys.svg">
+  <a href="https://app.enappsys.com/">
+    <img alt="EnAppSys" src="docs/assets/enappsys.svg">
+  </a>
 </picture>
 
 # EnAppSys Python Client
