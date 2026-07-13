@@ -175,6 +175,41 @@ day_ahead_chart = client.chart.get(
 df_day_ahead_chart = day_ahead_chart.to_df()
 ```
 
+Some charts support the optional `settlement` flag:
+
+```python
+settlement_chart = client.chart.get(
+    "csv",
+    code="gb/elec/pricing/daprices",
+    resolution="hh",
+    start_dt="2026-07-13T10:49",
+    end_dt="2026-07-13T18:49",
+    time_zone="WET",
+    currency="GBP",
+    settlement=True,
+)
+df_settlement = settlement_chart.to_df()
+```
+
+Some charts also support alternative time window modes via `time_display`:
+
+```python
+rolling_chart = client.chart.get(
+    "csv",
+    code="gb/elec/pricing/daprice/ensemble/forecast",
+    resolution="hh",
+    time_zone="WET",
+    currency="GBP",
+    settlement=True,
+    time_display="rolling",
+    amountback=4,
+    periodback="daily",
+    amountfor=4,
+    periodfor="min",
+)
+df_rolling = rolling_chart.to_df()
+```
+
 > [!NOTE]
 > Some charts contain non-timeseries data and may have a different structure.
 > Below chart types are supported. If you encounter a chart that is not yet supported, please open an issue and include a link to the chart.

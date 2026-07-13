@@ -12,7 +12,7 @@ from enappsys.enum import (
     ResolutionEnum,
     TimeZoneEnum,
 )
-from enappsys.exceptions import ContentTooLarge
+from enappsys.exceptions import ContentTooLarge, ValidationError
 from enappsys.services.base import APIBase, JSONBase, JSONMapBase, _warn_empty_response
 from enappsys.utils import validate_rename_columns_length, require_pandas
 
@@ -35,6 +35,11 @@ class ChartBase:
         currency,
         min_avg_max,
         settlement=False,
+        time_display=None,
+        amountback=None,
+        periodback=None,
+        amountfor=None,
+        periodfor=None,
     ):
         self.response = response
         self.url = url
@@ -48,6 +53,11 @@ class ChartBase:
         self.currency = currency
         self.min_avg_max = min_avg_max
         self.settlement = settlement
+        self.time_display = time_display
+        self.amountback = amountback
+        self.periodback = periodback
+        self.amountfor = amountfor
+        self.periodfor = periodfor
 
 
 class ChartCSV(ChartBase):
@@ -214,20 +224,45 @@ class ChartAPI(APIBase):
         self,
         response_format: Literal["csv", "json", "json_map", "xml"] | ResponseFormatEnum,
         code: str,
-        start_dt: str | datetime,
-        end_dt: str | datetime,
         resolution: str | ResolutionEnum,
+        start_dt: str | datetime | None = None,
+        end_dt: str | datetime | None = None,
         time_zone: str | TimeZoneEnum = "UTC",
         currency: str | CurrencyEnum = "EUR",
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
         settlement: bool = False,
+        time_display: Literal["rolling", "rolling-period"] | None = None,
+        amountback: int | None = None,
+        periodback: str | None = None,
+        amountfor: int | None = None,
+        periodfor: str | None = None,
     ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
         response_format_enum = self._get_response_format(response_format)
         params = {}
         self._add_code(params, code)
-        self._add_dt(params, start_dt, "start", "start_dt")
-        self._add_dt(params, end_dt, "end", "end_dt")
+        if time_display is None:
+            if start_dt is None or end_dt is None:
+                raise ValidationError(
+                    reason="Provide both 'start_dt' and 'end_dt' when time_display is None.",
+                    parameter="start_dt",
+                )
+            self._add_dt(params, start_dt, "start", "start_dt")
+            self._add_dt(params, end_dt, "end", "end_dt")
+        else:
+            if start_dt is not None or end_dt is not None:
+                raise ValidationError(
+                    reason="Do not provide 'start_dt'/'end_dt' when using time_display.",
+                    parameter="time_display",
+                )
+            self._add_time_display_params(
+                params,
+                time_display=time_display,
+                amountback=amountback,
+                periodback=periodback,
+                amountfor=amountfor,
+                periodfor=periodfor,
+            )
         self._add_resolution(params, resolution)
         self._add_time_zone(params, time_zone)
         self._add_currency(params, currency)
@@ -241,6 +276,8 @@ class ChartAPI(APIBase):
         try:
             response = self._session.get(url, params)
         except ContentTooLarge:
+            if time_display is not None:
+                raise
             chunks = self._get_in_chunks(url, params, start_dt, end_dt, resolution)
             response = self._assemble_chunks(chunks, response_format_enum.platform)
 
@@ -259,4 +296,9 @@ class ChartAPI(APIBase):
             currency,
             min_avg_max,
             settlement,
+            time_display,
+            amountback,
+            periodback,
+            amountfor,
+            periodfor,
         )

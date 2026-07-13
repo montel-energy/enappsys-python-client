@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING
 import logging
 
 import pandas as pd
+import pytest
 
+from enappsys.exceptions import ValidationError
 from enappsys.services.bulk import BulkCSV, BulkJSON, BulkJSONMap
 from enappsys.services.chart import ChartCSV, ChartJSON, ChartJSONMap
 
@@ -223,6 +225,7 @@ def test_chart_get_omits_settlement_by_default(client: "EnAppSys", monkeypatch):
 
     assert captured["url"] == "datadownload"
     assert "settlement" not in captured["params"]
+    assert "timedisplay" not in captured["params"]
 
 
 def test_chart_get_includes_settlement_when_true(client: "EnAppSys", monkeypatch):
@@ -246,6 +249,115 @@ def test_chart_get_includes_settlement_when_true(client: "EnAppSys", monkeypatch
     )
 
     assert captured["params"]["settlement"] == "true"
+
+
+def test_chart_get_rolling_includes_required_params_and_omits_start_end(
+    client: "EnAppSys", monkeypatch
+):
+    captured = {}
+
+    def fake_get(url, params):
+        captured["url"] = url
+        captured["params"] = dict(params)
+        return "Datetime,BE.BELGIUM\n,EUR/MWh\n"
+
+    monkeypatch.setattr(client._session, "get", fake_get)
+
+    client.chart.get(
+        "csv",
+        code="gb/elec/pricing/daprice/ensemble/forecast",
+        resolution="hh",
+        time_zone="WET",
+        currency="GBP",
+        settlement=True,
+        time_display="rolling",
+        amountback=4,
+        periodback="daily",
+        amountfor=4,
+        periodfor="min",
+    )
+
+    params = captured["params"]
+    assert captured["url"] == "datadownload"
+    assert "start" not in params
+    assert "end" not in params
+    assert params["timedisplay"] == "rolling"
+    assert params["amountback"] == 4
+    assert params["periodback"] == "daily"
+    assert params["amountfor"] == 4
+    assert params["periodfor"] == "min"
+    assert params["settlement"] == "true"
+
+
+def test_chart_get_rolling_period_includes_required_params_and_omits_start_end(
+    client: "EnAppSys", monkeypatch
+):
+    captured = {}
+
+    def fake_get(url, params):
+        captured["params"] = dict(params)
+        return "Datetime,BE.BELGIUM\n,EUR/MWh\n"
+
+    monkeypatch.setattr(client._session, "get", fake_get)
+
+    client.chart.get(
+        "csv",
+        code="gb/elec/pricing/daprice/ensemble/forecast",
+        resolution="hh",
+        time_zone="WET",
+        currency="GBP",
+        settlement=True,
+        time_display="rolling-period",
+        amountfor=4,
+        periodfor="yearly",
+    )
+
+    params = captured["params"]
+    assert "start" not in params
+    assert "end" not in params
+    assert params["timedisplay"] == "rolling-period"
+    assert params["amountfor"] == 4
+    assert params["periodfor"] == "yearly"
+    assert params["settlement"] == "true"
+
+
+def test_chart_get_time_display_validation(client: "EnAppSys"):
+    # time_display=None requires start/end
+    with pytest.raises(ValidationError):
+        client.chart.get(
+            "csv",
+            code="de/elec/pricing/daprices",
+            resolution="hourly",
+            time_zone="UTC",
+        )
+
+    # time_display set forbids start/end
+    with pytest.raises(ValidationError):
+        client.chart.get(
+            "csv",
+            code="de/elec/pricing/daprices",
+            start_dt="2023-01-01T00:00",
+            end_dt="2023-01-01T03:00",
+            resolution="hourly",
+            time_zone="UTC",
+            time_display="rolling",
+            amountback=1,
+            periodback="daily",
+            amountfor=1,
+            periodfor="daily",
+        )
+
+    # rolling requires all 4 fields
+    with pytest.raises(ValidationError):
+        client.chart.get(
+            "csv",
+            code="de/elec/pricing/daprices",
+            resolution="hourly",
+            time_zone="UTC",
+            time_display="rolling",
+            amountfor=1,
+            periodfor="daily",
+        )
 
 
 def test_chart_empty_warning_uses_full_url(client: "EnAppSys", monkeypatch, caplog):

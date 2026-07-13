@@ -46,6 +46,7 @@ def _warn_empty_response(
 
 class APIBase:
     API_MAX_ROWS = 150000
+    _CHART_ALLOWED_PERIODS = ("min", "hourly", "daily", "weekly", "monthly", "yearly")
     
     def __init__(self, client: EnAppSys):
         self._client = client
@@ -128,6 +129,74 @@ class APIBase:
             raise ValidationError(reason="Provide a boolean", parameter="settlement")
         if settlement:
             params[api_name] = str(settlement).lower()
+
+    @staticmethod
+    def _add_time_display(params, time_display: str | None, api_name: str = "timedisplay"):
+        if time_display is None:
+            return
+        if not isinstance(time_display, str):
+            raise ValidationError(reason="Provide a valid str", parameter="time_display")
+        if time_display not in ("rolling", "rolling-period"):
+            raise ValidationError(
+                reason="Provide one of: None, 'rolling', 'rolling-period'.",
+                parameter="time_display",
+            )
+        params[api_name] = time_display
+
+    @classmethod
+    def _validate_chart_period(cls, period: str | None, parameter: str) -> str:
+        if not isinstance(period, str):
+            raise ValidationError(
+                reason=f"Provide one of: {', '.join(cls._CHART_ALLOWED_PERIODS)}.",
+                parameter=parameter,
+            )
+        if period not in cls._CHART_ALLOWED_PERIODS:
+            raise ValidationError(
+                reason=f"Provide one of: {', '.join(cls._CHART_ALLOWED_PERIODS)}.",
+                parameter=parameter,
+            )
+        return period
+
+    @staticmethod
+    def _validate_positive_int(value: int | None, parameter: str) -> int:
+        if not isinstance(value, int) or value <= 0:
+            raise ValidationError(reason="Provide a positive integer.", parameter=parameter)
+        return value
+
+    @classmethod
+    def _add_time_display_params(
+        cls,
+        params: dict,
+        *,
+        time_display: str | None,
+        amountback: int | None = None,
+        periodback: str | None = None,
+        amountfor: int | None = None,
+        periodfor: str | None = None,
+    ) -> None:
+        """
+        Add chart `timedisplay` params and validate required combinations.
+
+        Supported:
+        - time_display is None: do nothing
+        - rolling: requires amountback/periodback/amountfor/periodfor
+        - rolling-period: requires amountfor/periodfor
+        """
+        if time_display is None:
+            return
+
+        cls._add_time_display(params, time_display)
+
+        if time_display == "rolling":
+            params["amountback"] = cls._validate_positive_int(amountback, "amountback")
+            params["periodback"] = cls._validate_chart_period(periodback, "periodback")
+            params["amountfor"] = cls._validate_positive_int(amountfor, "amountfor")
+            params["periodfor"] = cls._validate_chart_period(periodfor, "periodfor")
+            return
+
+        # rolling-period
+        params["amountfor"] = cls._validate_positive_int(amountfor, "amountfor")
+        params["periodfor"] = cls._validate_chart_period(periodfor, "periodfor")
 
     @staticmethod
     def _add_delimiter(

@@ -10,7 +10,7 @@ from enappsys.enum import (
     ResponseFormatEnum,
     TimeZoneEnum,
 )
-from enappsys.exceptions import ContentTooLarge
+from enappsys.exceptions import ContentTooLarge, ValidationError
 from enappsys.services_async.base import APIBaseAsync
 from enappsys.services.chart import ChartCSV, ChartJSON, ChartJSONMap, ChartXML
 
@@ -80,20 +80,45 @@ class AsyncChartAPI(APIBaseAsync):
         self,
         response_format: Literal["csv", "json", "json_map", "xml"] | ResponseFormatEnum,
         code: str,
-        start_dt: str | datetime,
-        end_dt: str | datetime,
         resolution: str | ResolutionEnum,
+        start_dt: str | datetime | None = None,
+        end_dt: str | datetime | None = None,
         time_zone: str | TimeZoneEnum = "UTC",
         currency: str | CurrencyEnum = "EUR",
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
         settlement: bool = False,
+        time_display: Literal["rolling", "rolling-period"] | None = None,
+        amountback: int | None = None,
+        periodback: str | None = None,
+        amountfor: int | None = None,
+        periodfor: str | None = None,
     ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
         response_format = self._get_response_format(response_format)
         params = {}
         self._add_code(params, code)
-        self._add_dt(params, start_dt, "start", "start_dt")
-        self._add_dt(params, end_dt, "end", "end_dt")
+        if time_display is None:
+            if start_dt is None or end_dt is None:
+                raise ValidationError(
+                    reason="Provide both 'start_dt' and 'end_dt' when time_display is None.",
+                    parameter="start_dt",
+                )
+            self._add_dt(params, start_dt, "start", "start_dt")
+            self._add_dt(params, end_dt, "end", "end_dt")
+        else:
+            if start_dt is not None or end_dt is not None:
+                raise ValidationError(
+                    reason="Do not provide 'start_dt'/'end_dt' when using time_display.",
+                    parameter="time_display",
+                )
+            self._add_time_display_params(
+                params,
+                time_display=time_display,
+                amountback=amountback,
+                periodback=periodback,
+                amountfor=amountfor,
+                periodfor=periodfor,
+            )
         self._add_resolution(params, resolution)
         self._add_time_zone(params, time_zone)
         self._add_currency(params, currency)
@@ -107,6 +132,8 @@ class AsyncChartAPI(APIBaseAsync):
         try:
             response = await self._session.get(url, params)
         except ContentTooLarge:
+            if time_display is not None:
+                raise
             chunks = await self._get_in_chunks_async(
                 url, params, start_dt, end_dt, resolution
             )
@@ -126,4 +153,9 @@ class AsyncChartAPI(APIBaseAsync):
             currency,
             min_avg_max,
             settlement,
+            time_display,
+            amountback,
+            periodback,
+            amountfor,
+            periodfor,
         )
