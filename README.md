@@ -1,3 +1,7 @@
+<picture align="center">
+  <img alt="EnAppSys" src="docs/assets/enappsys.svg">
+</picture>
+
 # EnAppSys Python Client
 
 The Python library for the [EnAppSys](https://app.enappsys.com) platform provides a light-weight, typed Python client to interact with EnAppSys' API services. Additionally, there is an asynchronous client for non-blocking operations.
