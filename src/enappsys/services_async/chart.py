@@ -87,7 +87,7 @@ class AsyncChartAPI(APIBaseAsync):
         currency: str | CurrencyEnum = "EUR",
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
-        settlement: bool = False,
+        enable_settlement_period: bool = False,
         time_display: Literal["rolling", "rolling-period"] | None = None,
         amountback: int | None = None,
         periodback: str | None = None,
@@ -123,7 +123,7 @@ class AsyncChartAPI(APIBaseAsync):
         self._add_time_zone(params, time_zone)
         self._add_currency(params, currency)
         self._add_min_avg_max(params, min_avg_max)
-        self._add_settlement(params, settlement)
+        self._add_settlement(params, enable_settlement_period)
         self._add_delimiter(params, delimiter, response_format)
         params["tag"] = response_format.chart_tag
 
@@ -152,7 +152,7 @@ class AsyncChartAPI(APIBaseAsync):
             time_zone,
             currency,
             min_avg_max,
-            settlement,
+            enable_settlement_period,
             time_display,
             amountback,
             periodback,

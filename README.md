@@ -175,7 +175,7 @@ day_ahead_chart = client.chart.get(
 df_day_ahead_chart = day_ahead_chart.to_df()
 ```
 
-Some charts support the optional `settlement` flag:
+Some charts support the optional `enable_settlement_period` flag:
 
 ```python
 settlement_chart = client.chart.get(
@@ -186,7 +186,7 @@ settlement_chart = client.chart.get(
     end_dt="2026-07-13T18:49",
     time_zone="WET",
     currency="GBP",
-    settlement=True,
+    enable_settlement_period=True,
 )
 df_settlement = settlement_chart.to_df()
 ```
@@ -200,7 +200,7 @@ rolling_chart = client.chart.get(
     resolution="hh",
     time_zone="WET",
     currency="GBP",
-    settlement=True,
+    enable_settlement_period=True,
     time_display="rolling",
     amountback=4,
     periodback="daily",

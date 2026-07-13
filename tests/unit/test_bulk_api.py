@@ -245,7 +245,7 @@ def test_chart_get_includes_settlement_when_true(client: "EnAppSys", monkeypatch
         resolution="hh",
         time_zone="WET",
         currency="GBP",
-        settlement=True,
+        enable_settlement_period=True,
     )
 
     assert captured["params"]["settlement"] == "true"
@@ -269,7 +269,7 @@ def test_chart_get_rolling_includes_required_params_and_omits_start_end(
         resolution="hh",
         time_zone="WET",
         currency="GBP",
-        settlement=True,
+        enable_settlement_period=True,
         time_display="rolling",
         amountback=4,
         periodback="daily",
@@ -306,7 +306,7 @@ def test_chart_get_rolling_period_includes_required_params_and_omits_start_end(
         resolution="hh",
         time_zone="WET",
         currency="GBP",
-        settlement=True,
+        enable_settlement_period=True,
         time_display="rolling-period",
         amountfor=4,
         periodfor="yearly",
