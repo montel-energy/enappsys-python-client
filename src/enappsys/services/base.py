@@ -123,6 +123,13 @@ class APIBase:
             raise ValidationError(reason="Provide a boolean", parameter="min_avg_max")
 
     @staticmethod
+    def _add_settlement(params, settlement: bool, api_name: str = "settlement"):
+        if not isinstance(settlement, bool):
+            raise ValidationError(reason="Provide a boolean", parameter="settlement")
+        if settlement:
+            params[api_name] = str(settlement).lower()
+
+    @staticmethod
     def _add_delimiter(
         params,
         delimiter: str | DelimiterEnum,

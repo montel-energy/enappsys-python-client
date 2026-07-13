@@ -202,6 +202,52 @@ def test_empty_chart_csv_to_df_applies_rename_columns(caplog):
     assert list(df.columns) == ["be_dap (EUR/MWh)"]
 
 
+def test_chart_get_omits_settlement_by_default(client: "EnAppSys", monkeypatch):
+    captured = {}
+
+    def fake_get(url, params):
+        captured["url"] = url
+        captured["params"] = dict(params)
+        return "Datetime,BE.BELGIUM\n,EUR/MWh\n"
+
+    monkeypatch.setattr(client._session, "get", fake_get)
+
+    client.chart.get(
+        "csv",
+        code="de/elec/pricing/daprices",
+        start_dt="2023-01-01T00:00",
+        end_dt="2023-01-01T03:00",
+        resolution="hourly",
+        time_zone="UTC",
+    )
+
+    assert captured["url"] == "datadownload"
+    assert "settlement" not in captured["params"]
+
+
+def test_chart_get_includes_settlement_when_true(client: "EnAppSys", monkeypatch):
+    captured = {}
+
+    def fake_get(url, params):
+        captured["params"] = dict(params)
+        return "Datetime,BE.BELGIUM\n,EUR/MWh\n"
+
+    monkeypatch.setattr(client._session, "get", fake_get)
+
+    client.chart.get(
+        "csv",
+        code="gb/elec/pricing/daprices",
+        start_dt="2026-07-13T10:49",
+        end_dt="2026-07-13T18:49",
+        resolution="hh",
+        time_zone="WET",
+        currency="GBP",
+        settlement=True,
+    )
+
+    assert captured["params"]["settlement"] == "true"
+
+
 def test_chart_empty_warning_uses_full_url(client: "EnAppSys", monkeypatch, caplog):
     def fake_get(url, params):
         assert url == "datadownload"

@@ -34,6 +34,7 @@ class ChartBase:
         time_zone,
         currency,
         min_avg_max,
+        settlement=False,
     ):
         self.response = response
         self.url = url
@@ -46,6 +47,7 @@ class ChartBase:
         self.time_zone = time_zone
         self.currency = currency
         self.min_avg_max = min_avg_max
+        self.settlement = settlement
 
 
 class ChartCSV(ChartBase):
@@ -219,6 +221,7 @@ class ChartAPI(APIBase):
         currency: str | CurrencyEnum = "EUR",
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
+        settlement: bool = False,
     ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
         response_format_enum = self._get_response_format(response_format)
         params = {}
@@ -229,6 +232,7 @@ class ChartAPI(APIBase):
         self._add_time_zone(params, time_zone)
         self._add_currency(params, currency)
         self._add_min_avg_max(params, min_avg_max)
+        self._add_settlement(params, settlement)
         self._add_delimiter(params, delimiter, response_format_enum)
         params["tag"] = response_format_enum.chart_tag
 
@@ -254,4 +258,5 @@ class ChartAPI(APIBase):
             time_zone,
             currency,
             min_avg_max,
+            settlement,
         )
