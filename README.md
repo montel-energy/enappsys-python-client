@@ -1,3 +1,9 @@
+<picture align="center">
+  <a href="https://app.enappsys.com/">
+    <img alt="EnAppSys" src="docs/assets/enappsys.svg">
+  </a>
+</picture>
+
 # EnAppSys Python Client
 
 The Python library for the [EnAppSys](https://app.enappsys.com) platform provides a light-weight, typed Python client to interact with EnAppSys' API services. Additionally, there is an asynchronous client for non-blocking operations.
@@ -173,6 +179,43 @@ day_ahead_chart = client.chart.get(
 )
 
 df_day_ahead_chart = day_ahead_chart.to_df()
+```
+
+Some charts support the optional `enable_settlement_period` flag:
+
+```python
+settlement_chart = client.chart.get(
+    "csv",
+    code="gb/elec/pricing/daprices",
+    resolution="hh",
+    start_dt="2026-07-13T10:49",
+    end_dt="2026-07-13T18:49",
+    time_zone="WET",
+    currency="GBP",
+    enable_settlement_period=True,
+)
+df_settlement = settlement_chart.to_df()
+```
+
+Some charts also support alternative time window modes via `time_display`:
+
+```python
+rolling_chart = client.chart.get(
+    "csv",
+    code="gb/elec/pricing/daprice/ensemble/forecast",
+    resolution="hh",
+    time_zone="WET",
+    currency="GBP",
+    enable_settlement_period=True,
+    time_display={
+        "mode": "rolling",
+        "periodback": "daily",
+        "amountback": 4,
+        "periodfor": "min",
+        "amountfor": 4,
+    },
+)
+df_rolling = rolling_chart.to_df()
 ```
 
 > [!NOTE]
