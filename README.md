@@ -207,11 +207,13 @@ rolling_chart = client.chart.get(
     time_zone="WET",
     currency="GBP",
     enable_settlement_period=True,
-    time_display="rolling",
-    amountback=4,
-    periodback="daily",
-    amountfor=4,
-    periodfor="min",
+    time_display={
+        "mode": "rolling",
+        "periodback": "daily",
+        "amountback": 4,
+        "periodfor": "min",
+        "amountfor": 4,
+    },
 )
 df_rolling = rolling_chart.to_df()
 ```

@@ -204,6 +204,62 @@ def test_empty_chart_csv_to_df_applies_rename_columns(caplog):
     assert list(df.columns) == ["be_dap (EUR/MWh)"]
 
 
+
+def test_chart_csv_to_df_keeps_settlement_period_last_with_rename_and_units():
+    out = ChartCSV(
+        """Datetime,BE.BELGIUM,settlement period
+,EUR/MWh,
+[01/01/2023 00:00],1.2,1
+""",
+        "datadownload",
+        {"settlement": "true"},
+        "csv",
+        "gb/elec/pricing/daprices",
+        None,
+        None,
+        "hh",
+        "UTC",
+        "GBP",
+        False,
+        True,
+    )
+
+    df = out.to_df(rename_columns=["be_dap"], unit_in_columns=True)
+
+    assert list(df.columns) == ["be_dap (EUR/MWh)", "settlement period"]
+    assert df["settlement period"].tolist() == [1]
+
+
+def test_chart_csv_to_df_keeps_settlement_period_last_with_min_avg_max_rename():
+    out = ChartCSV(
+        """Datetime,BE.BELGIUM (MIN),BE.BELGIUM (AV),BE.BELGIUM (MAX),settlement period
+,EUR/MWh,EUR/MWh,EUR/MWh,
+[01/01/2023 00:00],1.0,2.0,3.0,1
+""",
+        "datadownload",
+        {"settlement": "true"},
+        "csv",
+        "gb/elec/pricing/daprices",
+        None,
+        None,
+        "hh",
+        "UTC",
+        "GBP",
+        True,
+        True,
+    )
+
+    df = out.to_df(rename_columns=["be_dap"])
+
+    assert list(df.columns) == [
+        "be_dap (MIN)",
+        "be_dap (AV)",
+        "be_dap (MAX)",
+        "settlement period",
+    ]
+    assert df["settlement period"].tolist() == [1]
+
+
 def test_chart_get_omits_settlement_by_default(client: "EnAppSys", monkeypatch):
     captured = {}
 
@@ -251,6 +307,18 @@ def test_chart_get_includes_settlement_when_true(client: "EnAppSys", monkeypatch
     assert captured["params"]["settlement"] == "true"
 
 
+
+def test_chart_get_rejects_settlement_for_non_csv(client: "EnAppSys"):
+    with pytest.raises(ValidationError):
+        client.chart.get(
+            "json",
+            code="gb/elec/pricing/daprices",
+            start_dt="2026-07-13T10:49",
+            end_dt="2026-07-13T18:49",
+            resolution="hh",
+            enable_settlement_period=True,
+        )
+
 def test_chart_get_rolling_includes_required_params_and_omits_start_end(
     client: "EnAppSys", monkeypatch
 ):
@@ -270,11 +338,13 @@ def test_chart_get_rolling_includes_required_params_and_omits_start_end(
         time_zone="WET",
         currency="GBP",
         enable_settlement_period=True,
-        time_display="rolling",
-        amountback=4,
-        periodback="daily",
-        amountfor=4,
-        periodfor="min",
+        time_display={
+            "mode": "rolling",
+            "periodback": "daily",
+            "amountback": 4,
+            "periodfor": "min",
+            "amountfor": 4,
+        },
     )
 
     params = captured["params"]
@@ -307,9 +377,11 @@ def test_chart_get_rolling_period_includes_required_params_and_omits_start_end(
         time_zone="WET",
         currency="GBP",
         enable_settlement_period=True,
-        time_display="rolling-period",
-        amountfor=4,
-        periodfor="yearly",
+        time_display={
+            "mode": "rolling_period",
+            "periodfor": "yearly",
+            "amountfor": 4,
+        },
     )
 
     params = captured["params"]
@@ -340,11 +412,13 @@ def test_chart_get_time_display_validation(client: "EnAppSys"):
             end_dt="2023-01-01T03:00",
             resolution="hourly",
             time_zone="UTC",
-            time_display="rolling",
-            amountback=1,
-            periodback="daily",
-            amountfor=1,
-            periodfor="daily",
+            time_display={
+                "mode": "rolling",
+                "periodback": "daily",
+                "amountback": 1,
+                "periodfor": "daily",
+                "amountfor": 1,
+            },
         )
 
     # rolling requires all 4 fields
@@ -354,9 +428,41 @@ def test_chart_get_time_display_validation(client: "EnAppSys"):
             code="de/elec/pricing/daprices",
             resolution="hourly",
             time_zone="UTC",
-            time_display="rolling",
-            amountfor=1,
-            periodfor="daily",
+            time_display={
+                "mode": "rolling",
+                "periodfor": "daily",
+                "amountfor": 1,
+            },
+        )
+
+    # rolling_period rejects backwards fields
+    with pytest.raises(ValidationError):
+        client.chart.get(
+            "csv",
+            code="de/elec/pricing/daprices",
+            resolution="hourly",
+            time_zone="UTC",
+            time_display={
+                "mode": "rolling_period",
+                "periodback": "daily",
+                "amountback": 1,
+                "periodfor": "daily",
+                "amountfor": 1,
+            },
+        )
+
+    # API spelling uses a Python underscore in public config
+    with pytest.raises(ValidationError):
+        client.chart.get(
+            "csv",
+            code="de/elec/pricing/daprices",
+            resolution="hourly",
+            time_zone="UTC",
+            time_display={
+                "mode": "rolling-period",
+                "periodfor": "daily",
+                "amountfor": 1,
+            },
         )
 
 

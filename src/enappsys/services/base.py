@@ -130,19 +130,6 @@ class APIBase:
         if settlement:
             params[api_name] = str(settlement).lower()
 
-    @staticmethod
-    def _add_time_display(params, time_display: str | None, api_name: str = "timedisplay"):
-        if time_display is None:
-            return
-        if not isinstance(time_display, str):
-            raise ValidationError(reason="Provide a valid str", parameter="time_display")
-        if time_display not in ("rolling", "rolling-period"):
-            raise ValidationError(
-                reason="Provide one of: None, 'rolling', 'rolling-period'.",
-                parameter="time_display",
-            )
-        params[api_name] = time_display
-
     @classmethod
     def _validate_chart_period(cls, period: str | None, parameter: str) -> str:
         if not isinstance(period, str):
@@ -164,39 +151,88 @@ class APIBase:
         return value
 
     @classmethod
-    def _add_time_display_params(
+    def _validate_time_display_keys(
         cls,
-        params: dict,
+        time_display: dict,
         *,
-        time_display: str | None,
-        amountback: int | None = None,
-        periodback: str | None = None,
-        amountfor: int | None = None,
-        periodfor: str | None = None,
+        required: set[str],
+        optional: set[str] = frozenset(),
     ) -> None:
+        keys = set(time_display)
+        allowed = {"mode", *required, *optional}
+        missing = required - keys
+        if missing:
+            raise ValidationError(
+                reason=f"Missing required time_display keys: {', '.join(sorted(missing))}.",
+                parameter="time_display",
+            )
+        unknown = keys - allowed
+        if unknown:
+            raise ValidationError(
+                reason=f"Unexpected time_display keys: {', '.join(sorted(unknown))}.",
+                parameter="time_display",
+            )
+
+    @classmethod
+    def _add_time_display_params(cls, params: dict, time_display: dict | None) -> None:
         """
         Add chart `timedisplay` params and validate required combinations.
 
         Supported:
         - time_display is None: do nothing
-        - rolling: requires amountback/periodback/amountfor/periodfor
-        - rolling-period: requires amountfor/periodfor
+        - {"mode": "rolling", "periodback": ..., "amountback": ...,
+          "periodfor": ..., "amountfor": ...}
+        - {"mode": "rolling_period", "periodfor": ...,
+          "amountfor": ...}
         """
         if time_display is None:
             return
+        if not isinstance(time_display, dict):
+            raise ValidationError(reason="Provide a dict or None.", parameter="time_display")
 
-        cls._add_time_display(params, time_display)
+        mode = time_display.get("mode")
+        if mode not in {"rolling", "rolling_period"}:
+            raise ValidationError(
+                reason="Provide one of: None, {'mode': 'rolling', ...}, {'mode': 'rolling_period', ...}.",
+                parameter="time_display",
+            )
 
-        if time_display == "rolling":
-            params["amountback"] = cls._validate_positive_int(amountback, "amountback")
-            params["periodback"] = cls._validate_chart_period(periodback, "periodback")
-            params["amountfor"] = cls._validate_positive_int(amountfor, "amountfor")
-            params["periodfor"] = cls._validate_chart_period(periodfor, "periodfor")
+        if mode == "rolling":
+            cls._validate_time_display_keys(
+                time_display,
+                required={
+                    "periodback",
+                    "amountback",
+                    "periodfor",
+                    "amountfor",
+                },
+            )
+            params["timedisplay"] = "rolling"
+            params["periodback"] = cls._validate_chart_period(
+                time_display["periodback"], "time_display.periodback"
+            )
+            params["amountback"] = cls._validate_positive_int(
+                time_display["amountback"], "time_display.amountback"
+            )
+            params["periodfor"] = cls._validate_chart_period(
+                time_display["periodfor"], "time_display.periodfor"
+            )
+            params["amountfor"] = cls._validate_positive_int(
+                time_display["amountfor"], "time_display.amountfor"
+            )
             return
 
-        # rolling-period
-        params["amountfor"] = cls._validate_positive_int(amountfor, "amountfor")
-        params["periodfor"] = cls._validate_chart_period(periodfor, "periodfor")
+        cls._validate_time_display_keys(
+            time_display,
+            required={"periodfor", "amountfor"},
+        )
+        params["timedisplay"] = "rolling-period"
+        params["periodfor"] = cls._validate_chart_period(
+            time_display["periodfor"], "time_display.periodfor"
+        )
+        params["amountfor"] = cls._validate_positive_int(
+            time_display["amountfor"], "time_display.amountfor"
+        )
 
     @staticmethod
     def _add_delimiter(

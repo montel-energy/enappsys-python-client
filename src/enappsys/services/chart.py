@@ -36,10 +36,6 @@ class ChartBase:
         min_avg_max,
         enable_settlement_period=False,
         time_display=None,
-        amountback=None,
-        periodback=None,
-        amountfor=None,
-        periodfor=None,
     ):
         self.response = response
         self.url = url
@@ -54,10 +50,6 @@ class ChartBase:
         self.min_avg_max = min_avg_max
         self.enable_settlement_period = enable_settlement_period
         self.time_display = time_display
-        self.amountback = amountback
-        self.periodback = periodback
-        self.amountfor = amountfor
-        self.periodfor = periodfor
 
 
 class ChartCSV(ChartBase):
@@ -77,9 +69,11 @@ class ChartCSV(ChartBase):
         tz_localize: bool, optional
             If True, localize tz-naive index. Default is True.
         rename_columns: list, dict, optional
-            If a list, provide new names for all entities.
-            If a dict, specify original entity names as keys and new names as values.
-            Default is None.
+            Rename chart data columns only. Optional metadata columns, such as
+            settlement period, keep their API-provided names and are not
+            included in list length validation. If a list, provide new names
+            for all chart entities. If a dict, specify original entity names
+            as keys and new names as values. Default is None.
         unit_in_columns : bool, optional
             If True, includes units: "<column_name> (<unit>)". Default is False.
 
@@ -112,6 +106,13 @@ class ChartCSV(ChartBase):
 
         columns = df.columns.get_level_values(0).to_list()
         units = df.columns.get_level_values(1).to_list()
+        settlement_column = None
+        if self.enable_settlement_period and columns:
+            maybe_settlement_column = str(columns[-1]).strip().lower().replace(" ", "_")
+            if maybe_settlement_column == "settlement_period":
+                settlement_column = columns.pop()
+                units.pop()
+
         if rename_columns or unit_in_columns:
             if isinstance(rename_columns, list):
                 validate_rename_columns_length(rename_columns, columns, step_size)
@@ -133,6 +134,9 @@ class ChartCSV(ChartBase):
                     columns[idx + 2] = f"{column_name} (MAX)"
                 else:
                     columns[idx] = column_name
+
+        if settlement_column is not None:
+            columns.append(settlement_column)
 
         df.columns = columns
 
@@ -232,12 +236,36 @@ class ChartAPI(APIBase):
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
         enable_settlement_period: bool = False,
-        time_display: Literal["rolling", "rolling-period"] | None = None,
-        amountback: int | None = None,
-        periodback: str | None = None,
-        amountfor: int | None = None,
-        periodfor: str | None = None,
+        time_display: dict | None = None,
     ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
+        """Fetch chart data.
+
+        By default, provide ``start_dt`` and ``end_dt`` for the requested date
+        range. For rolling chart windows, omit ``start_dt``/``end_dt`` and pass
+        ``time_display`` as a dictionary using the API parameter names.
+
+        Rolling windows require both backward and forward windows::
+
+            {
+                "mode": "rolling",
+                "periodback": "daily",
+                "amountback": 4,
+                "periodfor": "min",
+                "amountfor": 4,
+            }
+
+        Rolling-period windows require only the forward window::
+
+            {
+                "mode": "rolling_period",
+                "periodfor": "yearly",
+                "amountfor": 4,
+            }
+
+        ``rolling_period`` is the Python-facing spelling and is sent to the API
+        as ``timedisplay=rolling-period``. ``enable_settlement_period`` is only
+        supported for CSV responses.
+        """
         response_format_enum = self._get_response_format(response_format)
         params = {}
         self._add_code(params, code)
@@ -255,18 +283,16 @@ class ChartAPI(APIBase):
                     reason="Do not provide 'start_dt'/'end_dt' when using time_display.",
                     parameter="time_display",
                 )
-            self._add_time_display_params(
-                params,
-                time_display=time_display,
-                amountback=amountback,
-                periodback=periodback,
-                amountfor=amountfor,
-                periodfor=periodfor,
-            )
+            self._add_time_display_params(params, time_display)
         self._add_resolution(params, resolution)
         self._add_time_zone(params, time_zone)
         self._add_currency(params, currency)
         self._add_min_avg_max(params, min_avg_max)
+        if enable_settlement_period and response_format_enum != ResponseFormatEnum.CSV:
+            raise ValidationError(
+                reason="'enable_settlement_period' is only supported for CSV responses.",
+                parameter="enable_settlement_period",
+            )
         self._add_settlement(params, enable_settlement_period)
         self._add_delimiter(params, delimiter, response_format_enum)
         params["tag"] = response_format_enum.chart_tag
@@ -297,8 +323,4 @@ class ChartAPI(APIBase):
             min_avg_max,
             enable_settlement_period,
             time_display,
-            amountback,
-            periodback,
-            amountfor,
-            periodfor,
         )

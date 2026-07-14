@@ -88,12 +88,36 @@ class AsyncChartAPI(APIBaseAsync):
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
         enable_settlement_period: bool = False,
-        time_display: Literal["rolling", "rolling-period"] | None = None,
-        amountback: int | None = None,
-        periodback: str | None = None,
-        amountfor: int | None = None,
-        periodfor: str | None = None,
+        time_display: dict | None = None,
     ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
+        """Fetch chart data asynchronously.
+
+        By default, provide ``start_dt`` and ``end_dt`` for the requested date
+        range. For rolling chart windows, omit ``start_dt``/``end_dt`` and pass
+        ``time_display`` as a dictionary using the API parameter names.
+
+        Rolling windows require both backward and forward windows::
+
+            {
+                "mode": "rolling",
+                "periodback": "daily",
+                "amountback": 4,
+                "periodfor": "min",
+                "amountfor": 4,
+            }
+
+        Rolling-period windows require only the forward window::
+
+            {
+                "mode": "rolling_period",
+                "periodfor": "yearly",
+                "amountfor": 4,
+            }
+
+        ``rolling_period`` is the Python-facing spelling and is sent to the API
+        as ``timedisplay=rolling-period``. ``enable_settlement_period`` is only
+        supported for CSV responses.
+        """
         response_format = self._get_response_format(response_format)
         params = {}
         self._add_code(params, code)
@@ -111,18 +135,16 @@ class AsyncChartAPI(APIBaseAsync):
                     reason="Do not provide 'start_dt'/'end_dt' when using time_display.",
                     parameter="time_display",
                 )
-            self._add_time_display_params(
-                params,
-                time_display=time_display,
-                amountback=amountback,
-                periodback=periodback,
-                amountfor=amountfor,
-                periodfor=periodfor,
-            )
+            self._add_time_display_params(params, time_display)
         self._add_resolution(params, resolution)
         self._add_time_zone(params, time_zone)
         self._add_currency(params, currency)
         self._add_min_avg_max(params, min_avg_max)
+        if enable_settlement_period and response_format != ResponseFormatEnum.CSV:
+            raise ValidationError(
+                reason="'enable_settlement_period' is only supported for CSV responses.",
+                parameter="enable_settlement_period",
+            )
         self._add_settlement(params, enable_settlement_period)
         self._add_delimiter(params, delimiter, response_format)
         params["tag"] = response_format.chart_tag
@@ -154,8 +176,4 @@ class AsyncChartAPI(APIBaseAsync):
             min_avg_max,
             enable_settlement_period,
             time_display,
-            amountback,
-            periodback,
-            amountfor,
-            periodfor,
         )
