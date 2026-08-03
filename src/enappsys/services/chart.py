@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import io
 
 from datetime import datetime
@@ -18,6 +19,31 @@ from enappsys.utils import validate_rename_columns_length, require_pandas
 
 if TYPE_CHECKING:
     import pandas as pd
+
+
+def _pad_header_rows(response: str) -> str:
+    """Right-pad the two CSV header rows to an equal column count.
+
+    The settlement period column (when enabled) has no unit cell in the
+    second header row, so its row ends one field short. ``pandas.read_csv``
+    requires both header rows to have the same number of columns when using
+    a multi-row header, so pad the shorter row with empty fields.
+    """
+    lines = response.splitlines()
+    if len(lines) < 2:
+        return response
+
+    header_rows = list(csv.reader(lines[:2]))
+    if len(header_rows) != 2 or len(header_rows[0]) == len(header_rows[1]):
+        return response
+
+    max_len = max(len(row) for row in header_rows)
+    for row in header_rows:
+        row.extend([""] * (max_len - len(row)))
+
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator="\n").writerows(header_rows)
+    return buf.getvalue() + "\n".join(lines[2:])
 
 
 class ChartBase:
@@ -86,7 +112,7 @@ class ChartCSV(ChartBase):
 
         # TODO: Determine to include seconds manually
         df = pd.read_csv(
-            io.StringIO(self.response),
+            io.StringIO(_pad_header_rows(self.response)),
             header=[0, 1],
             index_col=0,
             parse_dates=True,
@@ -181,8 +207,9 @@ class ChartAPI(APIBase):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         currency: str | CurrencyEnum,
-        min_avg_max: bool,
+        min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
+        enable_settlement_period: bool = False,
     ) -> ChartCSV: ...
 
     @overload
@@ -195,7 +222,7 @@ class ChartAPI(APIBase):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         currency: str | CurrencyEnum,
-        min_avg_max: bool,
+        min_avg_max: bool = False,
     ) -> ChartJSON: ...
 
     @overload
@@ -208,7 +235,7 @@ class ChartAPI(APIBase):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         currency: str | CurrencyEnum,
-        min_avg_max: bool,
+        min_avg_max: bool = False,
     ) -> ChartJSONMap: ...
 
     @overload
@@ -221,7 +248,7 @@ class ChartAPI(APIBase):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         currency: str | CurrencyEnum,
-        min_avg_max: bool,
+        min_avg_max: bool = False,
     ) -> ChartXML: ...
 
     def get(
