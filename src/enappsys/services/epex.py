@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import warnings
 
 from datetime import date, datetime, time, timedelta
 from typing import Literal, TYPE_CHECKING, overload
@@ -13,6 +14,82 @@ from enappsys.utils import require_pandas, validate_rename_columns_length
 if TYPE_CHECKING:
     import pandas as pd
     from enappsys import EnAppSys
+
+
+def _resolve_ambiguous_fold(index: pd.DatetimeIndex, tz: str) -> tuple:
+    """Resolve which DST occurrence each ambiguous (autumn clock-change) timestamp in
+    ``index`` belongs to, using row order instead of sort order.
+
+    Trade-level data (e.g. settlement downloads) is a blotter of individual trade
+    timestamps in row order, not a sorted/regular time series, so pandas'
+    ``ambiguous="infer"`` (which assumes a single monotonic run) mis-detects many
+    spurious DST switches and raises.
+
+    Instead:
+      1. Localize twice, forcing ``ambiguous=True`` and ``ambiguous=False``. Positions
+         where the two results disagree are the genuinely ambiguous ones - this is
+         vectorized and needs no sorting.
+      2. Within each ambiguous window (grouped by local date, in case the data spans
+         more than one autumn clock change), find the large backward jump in *row
+         order* that marks the moment the clock actually went back: rows before it are
+         the first occurrence (DST), rows at/after it are the second occurrence
+         (standard time).
+      3. If no such jump is found (e.g. the first occurrence has no rows at all, so
+         every ambiguous row already belongs to the second occurrence with nothing to
+         jump from), the two occurrences can't be told apart from the data alone. We
+         assume the first (DST) occurrence for those rows and report that via the
+         returned ``all_resolved`` flag so the caller can warn.
+
+    Returns a ``(fold, all_resolved)`` tuple: ``fold`` is a bool array suitable for
+    ``ambiguous=`` (True selects the first/DST occurrence; values at non-ambiguous
+    positions are ignored by ``tz_localize``), and ``all_resolved`` is False if any
+    window had to fall back to the step 3 assumption.
+    """
+    import numpy as np
+
+    pd = require_pandas()
+
+    loc_dst = index.tz_localize(tz, ambiguous=True, nonexistent="shift_forward")
+    loc_std = index.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
+    is_ambiguous = np.asarray(loc_dst != loc_std)
+
+    fold = np.ones(len(index), dtype=bool)
+    if not is_ambiguous.any():
+        return fold, True
+
+    all_resolved = True
+    dates = index.normalize()
+    for day in pd.unique(dates[is_ambiguous]):
+        positions = np.flatnonzero(is_ambiguous & np.asarray(dates == day))
+        deltas = np.diff(index[positions].values) / np.timedelta64(1, "s")
+        expected_jump = abs((loc_std[positions[0]] - loc_dst[positions[0]]).total_seconds())
+        jump = np.flatnonzero(deltas <= -expected_jump / 2)
+        if jump.size:
+            fold[positions[jump[0] + 1 :]] = False
+        else:
+            all_resolved = False
+
+    return fold, all_resolved
+
+
+def _tz_localize_index(index: pd.DatetimeIndex, time_zone: str | TimeZoneEnum) -> pd.DatetimeIndex:
+    """Localize a naive datetime index to ``time_zone``, resolving ambiguous
+    autumn-clock-change timestamps from row order rather than sort order.
+
+    See :func:`_resolve_ambiguous_fold` for why ``ambiguous="infer"`` isn't used.
+    """
+    tz = TimeZoneEnum._from_value(time_zone).platform
+    fold, all_resolved = _resolve_ambiguous_fold(index, tz)
+    if not all_resolved:
+        warnings.warn(
+            "Could not determine, from the data, which DST occurrence some "
+            "ambiguous (autumn clock-change) timestamps belong to - e.g. the first "
+            "(DST) occurrence may have no rows at all, leaving no jump in the data "
+            "to detect the switch. These rows are assumed to belong to the first "
+            "(DST) occurrence and may have the wrong UTC offset.",
+            stacklevel=3,
+        )
+    return index.tz_localize(tz, ambiguous=fold, nonexistent="shift_forward")
 
 
 def _parse_epex_csv(
@@ -33,7 +110,7 @@ def _parse_epex_csv(
     )
     df.index.name = "dateTime"
     if tz_localize:
-        df.index = df.index.tz_localize(TimeZoneEnum._from_value(time_zone).platform, ambiguous="infer")
+        df.index = _tz_localize_index(df.index, time_zone)
 
     columns = df.columns.get_level_values(0).to_list()
     units = df.columns.get_level_values(1).to_list()
@@ -70,7 +147,7 @@ def _parse_epex_json(
     df = pd.DataFrame(response["data"]).set_index("dateTime")
     df.index = pd.to_datetime(df.index, format="%Y-%m-%dT%H:%M:%S")
     if tz_localize:
-        df.index = df.index.tz_localize(TimeZoneEnum._from_value(time_zone).platform, ambiguous="infer")
+        df.index = _tz_localize_index(df.index, time_zone)
     df.index.name = "dateTime"
 
     metadata_items = response.get("metadata", {}).get("items", {})
