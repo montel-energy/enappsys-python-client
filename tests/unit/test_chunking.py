@@ -160,3 +160,77 @@ class TestRequestSplitting:
     def test_assembled_csv_keeps_a_single_header(self, api):
         result = call(api, days=360)
         assert result.response.count("Datetime,Units,X") == 1
+
+
+class TestBoundaryAlignment:
+    """Chunk boundaries must land on the resolution grid.
+
+    The platform rounds a request's bounds outward to the nearest grid point.
+    An interior boundary sitting between two points is therefore rounded
+    outward by both neighbouring chunks, and the row at that point is returned
+    twice. Callers passing `datetime.now()` hit this on every boundary.
+    """
+
+    def test_interior_boundaries_land_on_the_grid(self, api):
+        unaligned = datetime(2024, 1, 1, 8, 41, 35, 699892)
+        api.get(
+            "csv",
+            data_type="SOME_TYPE",
+            entities=["A"],
+            start_dt=unaligned,
+            end_dt=unaligned + timedelta(days=365),
+            resolution="qh",
+            time_zone="UTC",
+        )
+        requests = api._session.requests
+        assert len(requests) > 1, "expected this window to be split"
+
+        # Every boundary except the caller's own start and end.
+        for request in requests[1:]:
+            minute = int(request["start"][-2:])
+            assert minute % 15 == 0, f"boundary off-grid: {request['start']}"
+
+    def test_the_callers_own_bounds_are_left_alone(self, api):
+        """Snapping the outer bounds would change the window requested, so the
+        split result would stop matching an unsplit one."""
+        unaligned = datetime(2024, 1, 1, 8, 41, 35, 699892)
+        end = unaligned + timedelta(days=365)
+        api.get(
+            "csv",
+            data_type="SOME_TYPE",
+            entities=["A"],
+            start_dt=unaligned,
+            end_dt=end,
+            resolution="qh",
+            time_zone="UTC",
+        )
+        requests = api._session.requests
+        assert requests[0]["start"] == unaligned.strftime("%Y%m%d%H%M")
+        assert requests[-1]["end"] == end.strftime("%Y%m%d%H%M")
+
+    def test_boundaries_never_go_backwards(self, api):
+        """Snapping must not produce a chunk that ends before it starts."""
+        unaligned = datetime(2024, 1, 1, 8, 41, 35, 699892)
+        api.get(
+            "csv",
+            data_type="SOME_TYPE",
+            entities=["A"],
+            start_dt=unaligned,
+            end_dt=unaligned + timedelta(days=120),
+            resolution="qh",
+            time_zone="UTC",
+            chunk_rows=97,
+        )
+        for request in api._session.requests:
+            assert request["start"] < request["end"]
+
+    @pytest.mark.parametrize("resolution", ["1s", "min", "qh", "hh", "hourly"])
+    def test_every_sub_daily_resolution_snaps(self, api, resolution):
+        from enappsys.enum import ResolutionEnum
+
+        delta = ResolutionEnum._from_value(resolution).delta
+        unaligned = datetime(2024, 1, 1, 8, 41, 35, 699892)
+        snapped = api._floor_to_resolution(unaligned, delta)
+        assert snapped <= unaligned
+        midnight = unaligned.replace(hour=0, minute=0, second=0, microsecond=0)
+        assert (snapped - midnight).total_seconds() % delta.total_seconds() == 0

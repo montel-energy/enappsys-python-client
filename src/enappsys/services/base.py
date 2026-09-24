@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from enappsys.enum import (
@@ -332,6 +332,24 @@ class APIBase:
         budget = CHUNK_ROWS if chunk_rows is None else chunk_rows
         return max(1, budget // max(1, series))
 
+    @staticmethod
+    def _floor_to_resolution(dt: datetime, delta: timedelta) -> datetime:
+        """Snap `dt` back to the resolution grid.
+
+        Chunk boundaries have to land on the grid. The platform rounds a
+        request's bounds outward to the nearest grid point, so an interior
+        boundary that sits between two points is rounded outward by *both*
+        neighbouring chunks and the row at that point comes back twice.
+
+        Only sub-daily resolutions are snapped; coarser ones already align.
+        """
+        step = delta.total_seconds()
+        if step <= 0 or step > 86400:
+            return dt
+        midnight = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        elapsed = (dt - midnight).total_seconds()
+        return midnight + timedelta(seconds=(elapsed // step) * step)
+
     def _get_in_chunks(
         self,
         url,
@@ -354,8 +372,14 @@ class APIBase:
 
         while chunk_start_dt < end_dt_obj:
             chunk_end_dt = chunk_start_dt + rows_per_chunk * delta
-            if chunk_end_dt > end_dt_obj:
+            if chunk_end_dt >= end_dt_obj:
+                # Keep the caller's own end, rounded however the platform
+                # rounds it for an unsplit request.
                 chunk_end_dt = end_dt_obj
+            else:
+                snapped = self._floor_to_resolution(chunk_end_dt, delta)
+                if snapped > chunk_start_dt:
+                    chunk_end_dt = snapped
                 
             # Update chunk parameters with new date range
             self._add_dt(chunk_params, chunk_start_dt, "start", "start_dt")

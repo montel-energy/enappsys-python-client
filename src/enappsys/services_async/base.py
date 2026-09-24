@@ -36,7 +36,16 @@ class APIBaseAsync(APIBase):
         tasks = []
         cursor = start_dt_obj
         while cursor < end_dt_obj:
-            chunk_end_dt = min(cursor + rows_per_chunk * delta, end_dt_obj)
+            chunk_end_dt = cursor + rows_per_chunk * delta
+            if chunk_end_dt >= end_dt_obj:
+                chunk_end_dt = end_dt_obj
+            else:
+                # Interior boundaries must land on the resolution grid, or the
+                # platform rounds them outward for both neighbouring chunks and
+                # the row at the boundary comes back twice.
+                snapped = self._floor_to_resolution(chunk_end_dt, delta)
+                if snapped > cursor:
+                    chunk_end_dt = snapped
             chunk_params = copy.deepcopy(params)
             self._add_dt(chunk_params, cursor, "start", "start_dt")
             self._add_dt(chunk_params, chunk_end_dt, "end", "end_dt")
