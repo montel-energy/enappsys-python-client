@@ -55,7 +55,7 @@ def test_session_get_logs_sanitized_request_params(monkeypatch, caplog):
     assert "csvapi" in caplog.text
     assert "ENTSOE_DAY_AHEAD_PRICES" in caplog.text
     assert "BE.BELGIUM" in caplog.text
-    assert "test-user" not in caplog.text
+    assert "test-user" in caplog.text
     assert "test-secret" not in caplog.text
 
 
@@ -82,7 +82,7 @@ def test_session_get_sanitizes_request_exception(monkeypatch):
     assert "ConnectionError" in message
     assert "csvapi" in message
     assert "ENTSOE_DAY_AHEAD_PRICES" in message
-    assert "test-user" not in message
+    assert "test-user" in message
     assert "test-secret" not in message
 
 
@@ -107,5 +107,5 @@ def test_session_get_adds_request_context_to_json_parse_errors(monkeypatch):
     assert "Failed to parse JSON response" in message
     assert "jsonapi" in message
     assert "ENTSOE_DAY_AHEAD_PRICES" in message
-    assert "test-user" not in message
+    assert "test-user" in message
     assert "test-secret" not in message

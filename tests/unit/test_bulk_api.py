@@ -89,7 +89,7 @@ def test_empty_bulk_csv_to_df_returns_empty_dataframe(caplog):
     assert "ENTSOE_DAY_AHEAD_PRICES" in caplog.text
     assert "BE.BELGIUM" in caplog.text
     assert "202301010000" in caplog.text
-    assert "test-user" not in caplog.text
+    assert "test-user" in caplog.text
     assert "test-secret" not in caplog.text
 
 

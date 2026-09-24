@@ -34,7 +34,8 @@ def _warn_empty_response(
         details.append(f"url={url}")
     if params:
         request_params = params.copy()
-        request_params.pop("user", None)
+        # The username identifies the caller and is not a secret; keep it so the
+        # warning can be traced back to an account.
         request_params.pop("pass", None)
         details.append(f"params={request_params}")
 

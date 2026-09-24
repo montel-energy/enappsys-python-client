@@ -13,6 +13,7 @@ from enappsys.exceptions import (
     InternalServerError,
     InvalidCredentials,
 )
+from enappsys.redaction import install as install_credential_filter
 from enappsys.services.base import APIBase
 from enappsys.utils import require_aiohttp
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class AsyncSession:
     def __init__(self, user, secret, credentials_file, max_retries, agent_id):
+        install_credential_filter()
         self._aiohttp = require_aiohttp()
 
         self._credentials = Credentials(user, secret, credentials_file)

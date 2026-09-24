@@ -16,6 +16,7 @@ from enappsys.exceptions import (
     ContentTooLarge,
     InvalidCredentials,
 )
+from enappsys.redaction import install as install_credential_filter
 from enappsys.services.base import APIBase
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 class Session:
     def __init__(self, user, secret, credentials_file, max_retries, agent_id):
+        # Credentials travel as query parameters, so urllib3's request-line
+        # logging would otherwise carry them into any DEBUG log.
+        install_credential_filter()
         self._credentials = Credentials(user, secret, credentials_file)
         self.session = requests.Session()
 
@@ -83,8 +87,12 @@ class Session:
 
     @staticmethod
     def _safe_params(params: dict) -> dict:
+        """Params with the secret removed, keeping the username.
+
+        The username says which account made the request, which is worth having
+        when tracing one; only the secret needs to go.
+        """
         safe_params = params.copy()
-        safe_params.pop("user", None)
         safe_params.pop("pass", None)
         return safe_params
 

@@ -79,6 +79,21 @@ The client looks for credentials in the following order:
     client = EnAppSys(credentials_file="path/to/credentials.json")
     ```
 
+#### Credentials in logs
+
+The platform authenticates with `user` and `pass` query parameters, so every
+request URL contains them. Creating a client therefore attaches a logging filter
+to `urllib3.connectionpool` and `aiohttp.client` that replaces the secret with
+`<redacted>`, because those libraries log the request line they send and would
+otherwise write it into any log with DEBUG enabled.
+
+The username and the rest of the URL are left alone, so the logs stay useful and
+a request can still be traced back to an account:
+
+```
+https://app.enappsys.com:443 "GET /csvapi?type=ENTSOE_DAY_AHEAD_PRICES&res=qh&user=your-username&pass=<redacted> HTTP/1.1" 200 None
+```
+
 ## Usage
 
 The EnAppSys client provides several download interfaces, depending on your user permissions.
