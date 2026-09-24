@@ -67,17 +67,46 @@ jobs:
 
       - name: Generate release notes
         if: steps.version.outputs.should_release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
         run: |
-          PREVIOUS_TAG="${{ steps.version.outputs.previous_tag }}"
-          {
-            echo "This release includes:"
-            echo ""
-            if [ -n "$PREVIOUS_TAG" ]; then
-              git log "${PREVIOUS_TAG}..HEAD" --format="- %s"
-            else
-              git log --format="- %s"
-            fi
-          } > release_notes.md
+          python - > release_notes.md <<'PY'
+          import os
+          import pathlib
+          import re
+          import subprocess
+
+          version = os.environ["VERSION"]
+          changelog = pathlib.Path("CHANGELOG.md")
+          section = ""
+
+          # Prefer a hand-written section for this version: commit subjects alone
+          # cannot carry a usage example or explain a behaviour change.
+          if changelog.exists():
+              match = re.search(
+                  rf"^##\s+\[?{re.escape(version)}\]?.*?$\n(.*?)(?=^##\s|\Z)",
+                  changelog.read_text(encoding="utf-8"),
+                  re.M | re.S,
+              )
+              if match:
+                  section = match.group(1).strip()
+
+          if section:
+              print(section)
+          else:
+              previous = os.environ.get("PREVIOUS_TAG", "")
+              revisions = [f"{previous}..HEAD"] if previous else []
+              log = subprocess.run(
+                  ["git", "log", *revisions, "--format=- %s"],
+                  capture_output=True,
+                  text=True,
+                  check=True,
+              ).stdout
+              print("This release includes:")
+              print()
+              print(log)
+          PY
 
       - name: Create GitHub release
         if: steps.version.outputs.should_release == 'true'
