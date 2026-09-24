@@ -14,6 +14,7 @@ from enappsys.enum import (
     ResponseFormatEnum,
     TimeZoneEnum,
 )
+from enappsys.config import CHUNK_ROWS
 from enappsys.exceptions import ValidationError
 from enappsys.utils import dt_series_format, require_pandas
 
@@ -276,6 +277,60 @@ class APIBase:
                 parameter=client_name,
             )
       
+    def _estimated_rows(
+        self,
+        start_dt: datetime | str,
+        end_dt: datetime | str,
+        resolution: str | ResolutionEnum,
+    ) -> int:
+        """Rows a request for this range would return, for a single series.
+
+        The platform stores each resolution separately rather than aggregating
+        on the way out, so response time follows the row count rather than the
+        span in wall-clock time.
+        """
+        start_dt_obj = self._get_dt(start_dt, "start_dt")
+        end_dt_obj = self._get_dt(end_dt, "end_dt")
+        delta = ResolutionEnum._from_value(resolution).delta
+        span = (end_dt_obj - start_dt_obj).total_seconds()
+        return max(0, int(span // delta.total_seconds()))
+
+    def _should_chunk(
+        self,
+        start_dt: datetime | str | None,
+        end_dt: datetime | str | None,
+        resolution: str | ResolutionEnum,
+        chunk_rows: int | None = None,
+        series: int = 1,
+    ) -> bool:
+        """Whether to split this request before sending it.
+
+        `series` scales the estimate by how many series are requested, because
+        the platform charges for each separately: two entities cost the same as
+        two single-entity requests.
+
+        Returns False when either bound is missing, which is how a caller
+        signals a rolling window -- there is no range to walk.
+        """
+        if start_dt is None or end_dt is None:
+            return False
+        budget = CHUNK_ROWS if chunk_rows is None else chunk_rows
+        if budget <= 0:
+            return False
+        estimated = self._estimated_rows(start_dt, end_dt, resolution)
+        return estimated * max(1, series) > budget
+
+    @staticmethod
+    def _chunk_size(chunk_rows: int | None = None, series: int = 1) -> int:
+        """Rows per chunk, so that rows x series stays within the budget.
+
+        The budget counts cells rather than rows because the platform charges
+        per series: a two-entity chunk does twice the work of a one-entity
+        chunk covering the same rows.
+        """
+        budget = CHUNK_ROWS if chunk_rows is None else chunk_rows
+        return max(1, budget // max(1, series))
+
     def _get_in_chunks(
         self,
         url,
@@ -283,17 +338,21 @@ class APIBase:
         start_dt: datetime | str,
         end_dt: datetime | str,
         resolution: str | ResolutionEnum,
+        chunk_rows: int | None = None,
     ):
         start_dt_obj = self._get_dt(start_dt, "start_dt")
         end_dt_obj = self._get_dt(end_dt, "end_dt")
-        
+
         data_chunks = []
         delta = ResolutionEnum._from_value(resolution).delta
+        # Defaults to the payload ceiling so the HTTP 413 fallback keeps its
+        # original behaviour; proactive callers pass the latency budget instead.
+        rows_per_chunk = self.API_MAX_ROWS if chunk_rows is None else chunk_rows
         chunk_params = copy.deepcopy(params)
         chunk_start_dt = copy.deepcopy(start_dt_obj)  # Now guaranteed to be datetime
-        
+
         while chunk_start_dt < end_dt_obj:
-            chunk_end_dt = chunk_start_dt + self.API_MAX_ROWS * delta
+            chunk_end_dt = chunk_start_dt + rows_per_chunk * delta
             if chunk_end_dt > end_dt_obj:
                 chunk_end_dt = end_dt_obj
                 

@@ -198,6 +198,7 @@ class BulkAPI(APIBase):
         entities: list[str] | None = None,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
+        chunk_rows: int | None = None,
     ) -> BulkCSV: ...
 
     @overload
@@ -211,6 +212,7 @@ class BulkAPI(APIBase):
         time_zone: str | TimeZoneEnum,
         entities: list[str] | None = None,
         min_avg_max: bool = False,
+        chunk_rows: int | None = None,
     ) -> BulkJSON: ...
 
     @overload
@@ -224,6 +226,7 @@ class BulkAPI(APIBase):
         time_zone: str | TimeZoneEnum,
         entities: list[str] | None = None,
         min_avg_max: bool = False,
+        chunk_rows: int | None = None,
     ) -> BulkJSONMap: ...
 
     @overload
@@ -250,6 +253,7 @@ class BulkAPI(APIBase):
         entities: list[str] | None = None,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
+        chunk_rows: int | None = None,
     ) -> BulkCSV | BulkJSON | BulkJSONMap | BulkXML:
         response_format_enum = self._get_response_format(response_format)
         params = {}
@@ -264,11 +268,27 @@ class BulkAPI(APIBase):
 
         url = response_format_enum.bulk_url
 
-        try:
-            response = self._session.get(url, params)
-        except ContentTooLarge:
-            chunks = self._get_in_chunks(url, params, start_dt, end_dt, resolution)
+        # XML is passed through unprocessed and _assemble_chunks cannot stitch
+        # it, so it is never split proactively.
+        series = len(entities) if entities else 1
+        if response_format_enum != ResponseFormatEnum.XML and self._should_chunk(
+            start_dt, end_dt, resolution, chunk_rows, series=series
+        ):
+            chunks = self._get_in_chunks(
+                url,
+                params,
+                start_dt,
+                end_dt,
+                resolution,
+                chunk_rows=self._chunk_size(chunk_rows, series),
+            )
             response = self._assemble_chunks(chunks, response_format_enum.platform)
+        else:
+            try:
+                response = self._session.get(url, params)
+            except ContentTooLarge:
+                chunks = self._get_in_chunks(url, params, start_dt, end_dt, resolution)
+                response = self._assemble_chunks(chunks, response_format_enum.platform)
 
         bulk_class = self._RESPONSE_FORMAT_MAP.get(response_format_enum)
 

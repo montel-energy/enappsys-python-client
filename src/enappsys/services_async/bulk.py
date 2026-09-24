@@ -34,6 +34,7 @@ class AsyncBulkAPI(APIBaseAsync):
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
+        chunk_rows: int | None = None,
     ) -> BulkCSV: ...
 
     @overload
@@ -47,6 +48,7 @@ class AsyncBulkAPI(APIBaseAsync):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
+        chunk_rows: int | None = None,
     ) -> BulkJSON: ...
     
     @overload
@@ -60,6 +62,7 @@ class AsyncBulkAPI(APIBaseAsync):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
+        chunk_rows: int | None = None,
     ) -> BulkJSONMap: ...
 
     @overload
@@ -86,6 +89,7 @@ class AsyncBulkAPI(APIBaseAsync):
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
+        chunk_rows: int | None = None,
     ) -> BulkCSV | BulkJSON | BulkJSONMap | BulkXML:
         response_format = self._get_response_format(response_format)
         params = {}
@@ -100,13 +104,30 @@ class AsyncBulkAPI(APIBaseAsync):
 
         url = response_format.bulk_url
 
-        try:
-            response = await self._session.get(url, params)
-        except ContentTooLarge:
+        # XML is passed through unprocessed and _assemble_chunks cannot stitch
+        # it, so it is never split proactively. Chunks here run concurrently,
+        # spaced by the session's rate limiter.
+        series = len(entities) if entities else 1
+        if response_format != ResponseFormatEnum.XML and self._should_chunk(
+            start_dt, end_dt, resolution, chunk_rows, series=series
+        ):
             chunks = await self._get_in_chunks_async(
-                url, params, start_dt, end_dt, resolution
+                url,
+                params,
+                start_dt,
+                end_dt,
+                resolution,
+                chunk_rows=self._chunk_size(chunk_rows, series),
             )
             response = self._assemble_chunks(chunks, response_format.platform)
+        else:
+            try:
+                response = await self._session.get(url, params)
+            except ContentTooLarge:
+                chunks = await self._get_in_chunks_async(
+                    url, params, start_dt, end_dt, resolution
+                )
+                response = self._assemble_chunks(chunks, response_format.platform)
 
         bulk_class = self._RESPONSE_FORMAT_MAP[response_format]
         return bulk_class(

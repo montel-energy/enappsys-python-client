@@ -149,6 +149,32 @@ data = client.bulk.get(
 df = data.to_df(timestamp=True, last_updated=True)
 ```
 
+#### Large requests
+
+Wide date ranges are split into several requests automatically and stitched back
+together, because the platform answers some series much more slowly as the range
+grows.
+
+Splitting kicks in above `CHUNK_ROWS` (5,000) rows, counting each entity
+separately, since requesting two entities costs as much as two requests. Pass
+`chunk_rows` to override it, or `chunk_rows=0` to send one request regardless:
+
+```python
+data = client.bulk.get(
+    "csv",
+    data_type="ENTSOE_AGGREGATED_GENERATION_PER_TYPE",
+    entities=["DE.GERMANY_SOLAR"],
+    start_dt="2023-01-01T00:00",
+    end_dt="2026-01-01T00:00",
+    resolution="qh",
+    time_zone="UTC",
+    chunk_rows=10_000,   # default is 5_000; 0 disables splitting
+)
+```
+
+On the asynchronous client the chunks are fetched concurrently, so the same
+three-year request completes in a matter of seconds.
+
 ### Chart API
 
 The Chart API extracts data directly from charts available on the EnAppSys platform.
