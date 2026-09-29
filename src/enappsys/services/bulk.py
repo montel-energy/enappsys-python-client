@@ -199,6 +199,7 @@ class BulkAPI(APIBase):
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
         chunk_rows: int | None = None,
+        units: str | None = None,
     ) -> BulkCSV: ...
 
     @overload
@@ -213,6 +214,7 @@ class BulkAPI(APIBase):
         entities: list[str] | None = None,
         min_avg_max: bool = False,
         chunk_rows: int | None = None,
+        units: str | None = None,
     ) -> BulkJSON: ...
 
     @overload
@@ -227,6 +229,7 @@ class BulkAPI(APIBase):
         entities: list[str] | None = None,
         min_avg_max: bool = False,
         chunk_rows: int | None = None,
+        units: str | None = None,
     ) -> BulkJSONMap: ...
 
     @overload
@@ -240,6 +243,7 @@ class BulkAPI(APIBase):
         time_zone: str | TimeZoneEnum,
         entities: list[str] | None = None,
         min_avg_max: bool = False,
+        units: str | None = None,
     ) -> BulkXML: ...
 
     def get(
@@ -254,6 +258,7 @@ class BulkAPI(APIBase):
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
         chunk_rows: int | None = None,
+        units: str | None = None,
     ) -> BulkCSV | BulkJSON | BulkJSONMap | BulkXML:
         response_format_enum = self._get_response_format(response_format)
         params = {}
@@ -265,6 +270,7 @@ class BulkAPI(APIBase):
         self._add_time_zone(params, time_zone)
         self._add_min_avg_max(params, min_avg_max)
         self._add_delimiter(params, delimiter, response_format_enum)
+        self._add_units(params, units)
 
         url = response_format_enum.bulk_url
 

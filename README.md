@@ -164,6 +164,42 @@ data = client.bulk.get(
 df = data.to_df(timestamp=True, last_updated=True)
 ```
 
+#### Units
+
+Series with a unit assigned have a base unit, shown in the chart info tooltip on
+the platform. They are returned in that unit unless you pass `units`, in which
+case the platform converts them. For example, API2 coal is quoted in USD/teCOAL:
+
+```python
+coal = client.bulk.get(
+    "csv",
+    data_type="spectron_closing_prices_coal_api2_cif_ara_mid",
+    entities=["PREVAILING"],
+    start_dt="2026-09-01T00:00",
+    end_dt="2026-09-02T00:00",
+    resolution="daily",
+    time_zone="CET",
+    units="EUR/MWh",   # or units="USD/teCOAL" (the base unit, same as omitting it)
+)
+
+df = coal.to_df(unit_in_columns=True)   # column "PREVAILING (EUR/MWh)"
+```
+
+An unknown unit name fails with HTTP 400. A known unit that the series cannot be
+converted to does not raise or warn: the data comes back in its base unit, but
+labelled with the unit you asked for (EUR/MWh gas requested as `EUR/te` returns
+the EUR/MWh values labelled `EUR/te`).
+
+A mapping of datatype-entities to their base units is currently not available
+through the API. You can read the base unit in either of these ways:
+
+- **Charts:** open the chart information, select the series in the dropdown and
+  read its Base Unit.
+- **Bulk API:** download a short range without `units`. In CSV the unit is in the
+  Units column (`to_df(unit_in_columns=True)` adds it to the column names). In
+  JSON it is under `metadata.dataTypes["<DATA_TYPE>.<ENTITY>"].unit`, e.g.
+  `"unit": "USD/teCOAL"` for `SPECTRON_CLOSING_PRICES_COAL_API2_CIF_ARA_MID.PREVAILING`.
+
 #### Large requests
 
 Wide date ranges are split into several requests automatically and stitched
@@ -260,6 +296,24 @@ rolling_chart = client.chart.get(
     },
 )
 df_rolling = rolling_chart.to_df()
+```
+
+CSV chart requests also take `units`, spelled as on the Bulk API
+([Units](#units)). Only units offered in the chart's Units dropdown, in the
+requested `currency`, are applied; anything else raises `ValidationError`
+instead of silently returning the base unit:
+
+```python
+coal_chart = client.chart.get(
+    "csv",
+    code="de/elec/spectron/coal",
+    start_dt="2026-09-01T00:00",
+    end_dt="2026-09-02T00:00",
+    resolution="daily",
+    time_zone="CET",
+    currency="EUR",
+    units="EUR/MWh 55% Eff",
+)
 ```
 
 > [!NOTE]

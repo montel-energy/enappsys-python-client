@@ -83,6 +83,19 @@ class APIBase:
         params[api_name] = CurrencyEnum._from_value(currency).platform
 
     @staticmethod
+    def _add_units(params, units: str | None, api_name: str = "units"):
+        """Ask the platform to convert the data to ``units``, e.g. "EUR/MWh".
+
+        Omitted when None, so the platform returns the series' native unit.
+        """
+        if units is None:
+            return
+        if isinstance(units, str) and units:
+            params[api_name] = units
+        else:
+            raise ValidationError(reason="Provide a non-empty str or None", parameter="units")
+
+    @staticmethod
     def _add_data_type(params, data_type: str, api_name: str = "type"):
         if isinstance(data_type, str):
             params[api_name] = data_type
