@@ -4,6 +4,29 @@ The section matching the version in `src/enappsys/__init__.py` becomes the body
 of the GitHub release. Without a matching section the release falls back to a
 list of commit subjects, so anything worth explaining belongs here.
 
+## 0.2.2
+
+### Bulk and chart requests can ask for a unit
+
+`bulk.get` and `chart.get` take an optional `units` argument, on both the
+synchronous and asynchronous client:
+
+```python
+client.bulk.get(..., units="EUR/MWh")
+client.chart.get("csv", ..., units="EUR/MWh 55% Eff")
+```
+
+Without it the platform returns a series in its base unit, as before. Use
+`to_df(unit_in_columns=True)` to see which unit came back.
+
+The Bulk API rejects an unknown unit with HTTP 400, but a known unit the series
+cannot be converted to comes back unconverted, labelled with the requested unit.
+
+The Chart API silently ignores a unit it cannot apply and returns the base unit,
+so `chart.get` raises `ValidationError` when the response is not in the
+requested unit. It uses the same spelling as `bulk.get` and is CSV only: JSON
+chart responses are relabelled with the requested unit but not converted.
+
 ## 0.2.1
 
 ### Fixes duplicate rows at chunk boundaries

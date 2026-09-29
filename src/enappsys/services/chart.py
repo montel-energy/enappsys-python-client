@@ -46,6 +46,39 @@ def _pad_header_rows(response: str) -> str:
     return buf.getvalue() + "\n".join(lines[2:])
 
 
+def _chart_units(units: str) -> str:
+    """Spell ``units`` the way the Chart API expects: "EUR/MWh 55% Eff" -> "EUR-MWh_55_Eff".
+
+    Inferred from the units tested so far; a unit needing another escape is
+    ignored by the platform, which ``_check_units_applied`` turns into an error.
+    """
+    return units.replace("/", "-").replace(" ", "_").replace("%", "")
+
+
+def _returned_units(response: str, delimiter) -> list[str]:
+    """Units of the series in a CSV chart response, from its second header row."""
+    character = DelimiterEnum._from_value(delimiter).character or "\t"
+    rows = list(csv.reader(response.splitlines()[:2], delimiter=character))
+    return [unit for unit in rows[1][1:] if unit] if len(rows) == 2 else []
+
+
+def _check_units_applied(response: str, delimiter, units: str) -> None:
+    """Raise if the chart ignored ``units``.
+
+    Unlike the Bulk API, the Chart API does not reject a unit it cannot apply:
+    it returns the base unit instead, labelled as such.
+    """
+    returned = _returned_units(response, delimiter)
+    if returned and units not in returned:
+        raise ValidationError(
+            reason=(
+                f"Chart returned {sorted(set(returned))} instead of '{units}'. Only units "
+                "offered for the chart, in the requested currency, are applied."
+            ),
+            parameter="units",
+        )
+
+
 class ChartBase:
     def __init__(
         self,
@@ -210,6 +243,7 @@ class ChartAPI(APIBase):
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
         enable_settlement_period: bool = False,
+        units: str | None = None,
     ) -> ChartCSV: ...
 
     @overload
@@ -264,6 +298,7 @@ class ChartAPI(APIBase):
         delimiter: str | DelimiterEnum = "comma",
         enable_settlement_period: bool = False,
         time_display: dict | None = None,
+        units: str | None = None,
     ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
         """Fetch chart data.
 
@@ -292,6 +327,10 @@ class ChartAPI(APIBase):
         ``rolling_period`` is the Python-facing spelling and is sent to the API
         as ``timedisplay=rolling-period``. ``enable_settlement_period`` is only
         supported for CSV responses.
+
+        ``units`` is only supported for CSV responses. It takes the same spelling
+        as the Bulk API, e.g. "EUR/MWh 55% Eff", and raises ``ValidationError``
+        if the chart returns another unit.
         """
         response_format_enum = self._get_response_format(response_format)
         params = {}
@@ -322,6 +361,15 @@ class ChartAPI(APIBase):
             )
         self._add_settlement(params, enable_settlement_period)
         self._add_delimiter(params, delimiter, response_format_enum)
+        if units is not None and response_format_enum != ResponseFormatEnum.CSV:
+            # JSON responses are relabelled with the requested unit but not converted.
+            raise ValidationError(
+                reason="'units' is only supported for CSV responses.",
+                parameter="units",
+            )
+        self._add_units(params, units)
+        if units is not None:
+            params["units"] = _chart_units(units)
         params["tag"] = response_format_enum.chart_tag
 
         url = "datadownload"
@@ -333,6 +381,9 @@ class ChartAPI(APIBase):
                 raise
             chunks = self._get_in_chunks(url, params, start_dt, end_dt, resolution)
             response = self._assemble_chunks(chunks, response_format_enum.platform)
+
+        if units is not None:
+            _check_units_applied(response, delimiter, units)
 
         chart_class = self._RESPONSE_FORMAT_MAP.get(response_format_enum)
 

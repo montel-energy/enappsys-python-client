@@ -12,7 +12,14 @@ from enappsys.enum import (
 )
 from enappsys.exceptions import ContentTooLarge, ValidationError
 from enappsys.services_async.base import APIBaseAsync
-from enappsys.services.chart import ChartCSV, ChartJSON, ChartJSONMap, ChartXML
+from enappsys.services.chart import (
+    ChartCSV,
+    ChartJSON,
+    ChartJSONMap,
+    ChartXML,
+    _chart_units,
+    _check_units_applied,
+)
 
 
 class AsyncChartAPI(APIBaseAsync):
@@ -35,6 +42,7 @@ class AsyncChartAPI(APIBaseAsync):
         currency: str | CurrencyEnum,
         min_avg_max: bool,
         delimiter: str | DelimiterEnum = "comma",
+        units: str | None = None,
     ) -> ChartCSV: ...
     
     @overload
@@ -89,6 +97,7 @@ class AsyncChartAPI(APIBaseAsync):
         delimiter: str | DelimiterEnum = "comma",
         enable_settlement_period: bool = False,
         time_display: dict | None = None,
+        units: str | None = None,
     ) -> ChartCSV | ChartJSON | ChartJSONMap | ChartXML:
         """Fetch chart data asynchronously.
 
@@ -117,6 +126,10 @@ class AsyncChartAPI(APIBaseAsync):
         ``rolling_period`` is the Python-facing spelling and is sent to the API
         as ``timedisplay=rolling-period``. ``enable_settlement_period`` is only
         supported for CSV responses.
+
+        ``units`` is only supported for CSV responses. It takes the same spelling
+        as the Bulk API, e.g. "EUR/MWh 55% Eff", and raises ``ValidationError``
+        if the chart returns another unit.
         """
         response_format = self._get_response_format(response_format)
         params = {}
@@ -147,6 +160,15 @@ class AsyncChartAPI(APIBaseAsync):
             )
         self._add_settlement(params, enable_settlement_period)
         self._add_delimiter(params, delimiter, response_format)
+        if units is not None and response_format != ResponseFormatEnum.CSV:
+            # JSON responses are relabelled with the requested unit but not converted.
+            raise ValidationError(
+                reason="'units' is only supported for CSV responses.",
+                parameter="units",
+            )
+        self._add_units(params, units)
+        if units is not None:
+            params["units"] = _chart_units(units)
         params["tag"] = response_format.chart_tag
 
         url = "datadownload"
@@ -160,6 +182,9 @@ class AsyncChartAPI(APIBaseAsync):
                 url, params, start_dt, end_dt, resolution
             )
             response = self._assemble_chunks(chunks, response_format.platform)
+
+        if units is not None:
+            _check_units_applied(response, delimiter, units)
 
         chart_class = self._RESPONSE_FORMAT_MAP[response_format]
         return chart_class(
