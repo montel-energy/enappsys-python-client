@@ -286,9 +286,8 @@ class APIBase:
     ) -> int:
         """Rows a request for this range would return, for a single series.
 
-        The platform stores each resolution separately rather than aggregating
-        on the way out, so response time follows the row count rather than the
-        span in wall-clock time.
+        Derived from the resolution rather than the span in wall-clock time,
+        since that is what determines how much data comes back.
         """
         start_dt_obj = self._get_dt(start_dt, "start_dt")
         end_dt_obj = self._get_dt(end_dt, "end_dt")
@@ -306,8 +305,8 @@ class APIBase:
     ) -> bool:
         """Whether to split this request before sending it.
 
-        `series` scales the estimate by how many series are requested, because
-        the platform charges for each separately: two entities cost the same as
+        `series` scales the estimate by how many series are requested: asking
+        for two entities returns two series' worth of data, the same as making
         two single-entity requests.
 
         Returns False when either bound is missing, which is how a caller
@@ -325,9 +324,8 @@ class APIBase:
     def _chunk_size(chunk_rows: int | None = None, series: int = 1) -> int:
         """Rows per chunk, so that rows x series stays within the budget.
 
-        The budget counts cells rather than rows because the platform charges
-        per series: a two-entity chunk does twice the work of a one-entity
-        chunk covering the same rows.
+        The budget counts cells rather than rows: a two-entity chunk returns
+        twice the data of a one-entity chunk covering the same rows.
         """
         budget = CHUNK_ROWS if chunk_rows is None else chunk_rows
         return max(1, budget // max(1, series))
@@ -365,7 +363,7 @@ class APIBase:
         data_chunks = []
         delta = ResolutionEnum._from_value(resolution).delta
         # Defaults to the payload ceiling so the HTTP 413 fallback keeps its
-        # original behaviour; proactive callers pass the latency budget instead.
+        # original behaviour; proactive callers pass their own budget instead.
         rows_per_chunk = self.API_MAX_ROWS if chunk_rows is None else chunk_rows
         chunk_params = copy.deepcopy(params)
         chunk_start_dt = copy.deepcopy(start_dt_obj)  # Now guaranteed to be datetime

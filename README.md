@@ -166,12 +166,12 @@ df = data.to_df(timestamp=True, last_updated=True)
 
 #### Large requests
 
-Wide date ranges are split into several requests automatically and stitched back
-together, because the platform answers some series much more slowly as the range
-grows.
+Wide date ranges are split into several requests automatically and stitched
+back together, so a long history arrives as one result without you having to
+loop over it.
 
 Splitting kicks in above `CHUNK_ROWS` (5,000) rows, counting each entity
-separately, since requesting two entities costs as much as two requests. Pass
+separately, since requesting two entities returns two series worth of data. Pass
 `chunk_rows` to override it, or `chunk_rows=0` to send one request regardless:
 
 ```python
@@ -187,8 +187,11 @@ data = client.bulk.get(
 )
 ```
 
-On the asynchronous client the chunks are fetched concurrently, so the same
-three-year request completes in a matter of seconds.
+On the asynchronous client the chunks are fetched concurrently.
+
+Raising `chunk_rows` means fewer, larger requests; lowering it means more,
+smaller ones. Leave it alone unless you have measured that a different value
+helps for the series you fetch.
 
 ### Chart API
 
