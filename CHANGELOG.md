@@ -4,7 +4,35 @@ The section matching the version in `src/enappsys/__init__.py` becomes the body
 of the GitHub release. Without a matching section the release falls back to a
 list of commit subjects, so anything worth explaining belongs here.
 
-## 0.2.2
+## 0.3.0
+
+### Splitting wide requests
+
+A wide date range can be split into several requests and stitched back
+together, so a long history arrives as one result. It is off unless asked for:
+
+```python
+client.bulk.get(...)                    # one request
+client.bulk.get(..., chunk_rows=True)   # split at CHUNK_ROWS (5,000)
+client.bulk.get(..., chunk_rows=10_000) # split at a budget you choose
+```
+
+Splitting counts each entity separately, since requesting two entities returns
+two series worth of data. On the asynchronous client the chunks are fetched
+concurrently. The HTTP 413 fallback is unchanged: a request over the payload
+ceiling is still split automatically, since the alternative there is failing
+outright.
+
+It is opt-in because several requests are not one request. If the data is
+updated while the chunks are in flight, the later ones return the new values
+and the earlier ones the old, and there is nothing in a stitched result that
+shows it happened.
+
+Two faults in the withdrawn 0.2.x splitting are fixed here: boundaries were
+placed on the resolution asked for rather than the one the series is published
+on, so the row at each boundary came back twice, and the decision to split
+compared the two bounds, which raised `TypeError` when one carried a timezone
+and the other did not.
 
 ### Bulk and chart requests can ask for a unit
 
@@ -27,65 +55,6 @@ so `chart.get` raises `ValidationError` when the response is not in the
 requested unit. It uses the same spelling as `bulk.get` and is CSV only: JSON
 chart responses are relabelled with the requested unit but not converted.
 
-## 0.2.1
-
-### Fixes duplicate rows at chunk boundaries
-
-Requests split by 0.2.0 could return the row at each chunk boundary twice. A
-three-year quarter-hourly fetch came back with 21 duplicates.
-
-**Anyone using 0.2.0 should upgrade.** The duplicates are silent — the data is
-correct apart from the repeats, so nothing raises unless something downstream
-rejects a duplicated index.
-
-Only affected requests large enough to be split whose window was not aligned to
-the resolution grid, which is any caller passing `datetime.now()` or similar.
-Aligned windows, and requests below `CHUNK_ROWS`, were never affected.
-
-The platform rounds a request's bounds outward to the nearest grid point, so an
-interior boundary between two points was rounded outward by both neighbouring
-chunks. Boundaries are now snapped to the grid; the caller's own start and end
-are left untouched, so a split result matches an unsplit one exactly.
-
-To check data already fetched with 0.2.0:
-
-```python
-duplicates = int(df.index.duplicated().sum())    # should be 0
-```
-
-## 0.2.0
-
-### Wide requests are split automatically
-
-Requests covering a wide date range are now split into several smaller ones and
-stitched back together, returning identical data. A long history arrives as a
-single result without you having to loop over it yourself.
-
-Nothing needs to change at the call site. `bulk.get()` takes an optional
-`chunk_rows` to control it:
-
-```python
-data = client.bulk.get(
-    "csv",
-    data_type="ENTSOE_AGGREGATED_GENERATION_PER_TYPE",
-    entities=["DE.GERMANY_SOLAR"],
-    start_dt="2023-01-01T00:00",
-    end_dt="2026-01-01T00:00",
-    resolution="qh",
-    time_zone="UTC",
-    chunk_rows=10_000,   # optional; defaults to CHUNK_ROWS (5,000), 0 disables
-)
-```
-
-Splitting applies above `CHUNK_ROWS` rows, counting each entity separately,
-since requesting two entities is equivalent to making two single-entity
-requests. Pass a larger `chunk_rows` for fewer, wider requests, or
-`chunk_rows=0` to send a single request as before. On the asynchronous client
-the chunks are fetched concurrently.
-
-XML responses are never split, since they cannot be stitched back together.
-The existing HTTP 413 fallback is unchanged.
-
 ### The secret is kept out of HTTP library logs
 
 The platform authenticates with `user` and `pass` query parameters, so every
@@ -107,3 +76,8 @@ does.
 
 If you have run this client with DEBUG logging enabled, the secret may already
 be present in existing logs; this change does not remove it.
+
+## 0.2.0 - 0.2.2 (withdrawn)
+
+Yanked on PyPI. Use 0.3.0, which carries everything they introduced. Their
+request splitting was on by default and could return duplicate rows.

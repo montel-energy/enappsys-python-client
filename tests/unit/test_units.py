@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from enappsys.config import CHUNK_ROWS
 from enappsys.exceptions import ValidationError
 from enappsys.services.bulk import BulkAPI
 from enappsys.services.chart import ChartAPI
@@ -91,7 +92,7 @@ class TestUnits:
 
     def test_carried_to_every_chunk(self, api):
         """A split request must convert every chunk, not only the first."""
-        api.get("csv", **kwargs(days=400, units="EUR/MWh"))
+        api.get("csv", **kwargs(days=400, units="EUR/MWh", chunk_rows=CHUNK_ROWS))
         requests = api._session.requests
         assert len(requests) > 1
         assert all(r["units"] == "EUR/MWh" for r in requests)

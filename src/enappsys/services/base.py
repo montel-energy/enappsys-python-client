@@ -302,18 +302,34 @@ class APIBase:
         Derived from the resolution rather than the span in wall-clock time,
         since that is what determines how much data comes back.
         """
-        start_dt_obj = self._get_dt(start_dt, "start_dt")
-        end_dt_obj = self._get_dt(end_dt, "end_dt")
+        start_dt_obj = self._wall_clock(start_dt, "start_dt")
+        end_dt_obj = self._wall_clock(end_dt, "end_dt")
         delta = ResolutionEnum._from_value(resolution).delta
         span = (end_dt_obj - start_dt_obj).total_seconds()
         return max(0, int(span // delta.total_seconds()))
+
+    @classmethod
+    def _resolve_chunk_rows(cls, chunk_rows: bool | int | None) -> int | None:
+        """Rows per request the caller is asking for, or None for one request.
+
+        `True` means "split, but decide for me", and picks `CHUNK_ROWS`. An int
+        names the budget instead, which is worth doing when a series answers
+        slowly at a wide range, or when fewer, larger requests suit better.
+
+        `None` and `False` both mean a single request.
+        """
+        if chunk_rows is None or chunk_rows is False:
+            return None
+        if chunk_rows is True:
+            return CHUNK_ROWS
+        return chunk_rows if chunk_rows > 0 else None
 
     def _should_chunk(
         self,
         start_dt: datetime | str | None,
         end_dt: datetime | str | None,
         resolution: str | ResolutionEnum,
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         series: int = 1,
     ) -> bool:
         """Whether to split this request before sending it.
@@ -322,25 +338,34 @@ class APIBase:
         for two entities returns two series' worth of data, the same as making
         two single-entity requests.
 
-        Returns False when either bound is missing, which is how a caller
+        Returns False unless `chunk_rows` asks for splitting. Several requests
+        are not one request: if the range is updated while they are in flight,
+        the later chunks carry the new values and the earlier ones do not, and
+        nothing here can detect that, let alone repair it. A caller who wants
+        splitting is accepting that, so they have to ask. See
+        `_resolve_chunk_rows` for what may be asked with.
+
+        Also returns False when either bound is missing, which is how a caller
         signals a rolling window -- there is no range to walk.
         """
-        if start_dt is None or end_dt is None:
+        budget = self._resolve_chunk_rows(chunk_rows)
+        if budget is None:
             return False
-        budget = CHUNK_ROWS if chunk_rows is None else chunk_rows
-        if budget <= 0:
+        if start_dt is None or end_dt is None:
             return False
         estimated = self._estimated_rows(start_dt, end_dt, resolution)
         return estimated * max(1, series) > budget
 
     @staticmethod
-    def _chunk_size(chunk_rows: int | None = None, series: int = 1) -> int:
+    def _chunk_size(chunk_rows: bool | int | None = None, series: int = 1) -> int:
         """Rows per chunk, so that rows x series stays within the budget.
 
         The budget counts cells rather than rows: a two-entity chunk returns
         twice the data of a one-entity chunk covering the same rows.
         """
-        budget = CHUNK_ROWS if chunk_rows is None else chunk_rows
+        budget = APIBase._resolve_chunk_rows(chunk_rows)
+        if budget is None:
+            budget = CHUNK_ROWS
         return max(1, budget // max(1, series))
 
     @staticmethod
@@ -361,6 +386,62 @@ class APIBase:
         elapsed = (dt - midnight).total_seconds()
         return midnight + timedelta(seconds=(elapsed // step) * step)
 
+    @staticmethod
+    def _boundary_grids(delta: timedelta) -> list[timedelta]:
+        """Grids a boundary may be snapped back to, coarsest first.
+
+        Taken from `ResolutionEnum`, which is every resolution the platform
+        serves, so there is no cadence a series can have that is not in here.
+        Only those up to a day are usable: each divides a day evenly, which is
+        what makes flooring from midnight well defined. Weekly and longer need
+        an epoch to count from and are left out.
+        """
+        day = timedelta(days=1)
+        return sorted(
+            {
+                resolution.delta
+                for resolution in ResolutionEnum
+                if delta < resolution.delta <= day
+            },
+            reverse=True,
+        )
+
+    @staticmethod
+    def _wall_clock(dt: datetime | str, client_name: str) -> datetime:
+        """The bound as the platform will read it, with its timezone dropped.
+
+        Bounds go out as wall-clock strings (see `_add_dt`) and are interpreted
+        in the request's own `time_zone`, so the span the platform serves is the
+        wall-clock difference rather than the absolute one. Dropping tzinfo here
+        matches that, and it keeps a mixed-awareness pair from raising:
+        `pendulum` returns a *naive* DateTime from `astimezone(...) + timedelta`,
+        so callers hand over one aware and one naive bound without meaning to.
+        """
+        return APIBase._get_dt(dt, client_name).replace(tzinfo=None)
+
+    def _snap_boundary(
+        self, dt: datetime, delta: timedelta, after: datetime
+    ) -> datetime:
+        """Snap an interior chunk boundary back onto a grid the platform shares.
+
+        The platform rounds a request's bounds outward to the nearest point of
+        the *series'* grid, which can be coarser than the resolution asked for:
+        ENTSOE generation for the Nordic zones is published hourly and is
+        routinely fetched at quarter-hourly. A boundary on the requested grid
+        but inside an hour is then rounded outward by both neighbouring chunks,
+        and the row at that point comes back twice.
+
+        Snapping to the coarsest grid that still moves the boundary past
+        `after` makes it safe for any series published at that resolution or
+        finer. The chunk ends a little short of its budget in exchange.
+        """
+        for grid in self._boundary_grids(delta):
+            snapped = self._floor_to_resolution(dt, grid)
+            if snapped > after:
+                return snapped
+        snapped = self._floor_to_resolution(dt, delta)
+        return snapped if snapped > after else dt
+
     def _get_in_chunks(
         self,
         url,
@@ -370,8 +451,8 @@ class APIBase:
         resolution: str | ResolutionEnum,
         chunk_rows: int | None = None,
     ):
-        start_dt_obj = self._get_dt(start_dt, "start_dt")
-        end_dt_obj = self._get_dt(end_dt, "end_dt")
+        start_dt_obj = self._wall_clock(start_dt, "start_dt")
+        end_dt_obj = self._wall_clock(end_dt, "end_dt")
 
         data_chunks = []
         delta = ResolutionEnum._from_value(resolution).delta
@@ -388,9 +469,9 @@ class APIBase:
                 # rounds it for an unsplit request.
                 chunk_end_dt = end_dt_obj
             else:
-                snapped = self._floor_to_resolution(chunk_end_dt, delta)
-                if snapped > chunk_start_dt:
-                    chunk_end_dt = snapped
+                chunk_end_dt = self._snap_boundary(
+                    chunk_end_dt, delta, after=chunk_start_dt
+                )
                 
             # Update chunk parameters with new date range
             self._add_dt(chunk_params, chunk_start_dt, "start", "start_dt")

@@ -34,7 +34,7 @@ class AsyncBulkAPI(APIBaseAsync):
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkCSV: ...
 
@@ -49,7 +49,7 @@ class AsyncBulkAPI(APIBaseAsync):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkJSON: ...
     
@@ -64,7 +64,7 @@ class AsyncBulkAPI(APIBaseAsync):
         resolution: str | ResolutionEnum,
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkJSONMap: ...
 
@@ -93,7 +93,7 @@ class AsyncBulkAPI(APIBaseAsync):
         time_zone: str | TimeZoneEnum,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkCSV | BulkJSON | BulkJSONMap | BulkXML:
         response_format = self._get_response_format(response_format)

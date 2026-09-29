@@ -2,7 +2,8 @@ BACKOFF_FACTOR = 0.5
 RATE_LIMIT_DELAY = 0.1
 STATUS_FORCELIST = (429, 500, 502, 503, 504)
 
-# Default rows per request before a wide date range is split. This is a request
+# Rows per request that `chunk_rows=True` selects, when a caller opts in to
+# splitting a wide date range without naming a budget. This is a request
 # sizing budget, not a payload limit -- APIBase.API_MAX_ROWS remains the payload
 # ceiling that the HTTP 413 fallback respects.
 #

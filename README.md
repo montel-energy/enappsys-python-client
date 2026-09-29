@@ -202,13 +202,9 @@ through the API. You can read the base unit in either of these ways:
 
 #### Large requests
 
-Wide date ranges are split into several requests automatically and stitched
-back together, so a long history arrives as one result without you having to
-loop over it.
-
-Splitting kicks in above `CHUNK_ROWS` (5,000) rows, counting each entity
-separately, since requesting two entities returns two series worth of data. Pass
-`chunk_rows` to override it, or `chunk_rows=0` to send one request regardless:
+A wide date range can be split into several requests and stitched back
+together, so a long history arrives as one result. It is off unless you ask for
+it:
 
 ```python
 data = client.bulk.get(
@@ -219,15 +215,27 @@ data = client.bulk.get(
     end_dt="2026-01-01T00:00",
     resolution="qh",
     time_zone="UTC",
-    chunk_rows=10_000,   # default is 5_000; 0 disables splitting
+    chunk_rows=True,
 )
 ```
 
-On the asynchronous client the chunks are fetched concurrently.
+`chunk_rows` takes three forms:
 
-Raising `chunk_rows` means fewer, larger requests; lowering it means more,
-smaller ones. Leave it alone unless you have measured that a different value
-helps for the series you fetch.
+| value | effect |
+| --- | --- |
+| omitted, `None` or `False` | one request |
+| `True` | split at `CHUNK_ROWS` (5,000) |
+| an `int` | split at that many rows |
+
+`True` is the one to reach for first. Name a number instead when you want
+fewer, larger requests, or more, smaller ones. Either way the count is cells
+rather than rows, since requesting two entities returns two series worth of
+data. On the asynchronous client the chunks are fetched concurrently.
+
+Worth knowing before you opt in: several requests are not one request. For example, if the
+data is updated while the chunks are in flight, the later ones return the new
+values and the earlier ones the old, and a stitched result does not show that
+it happened. Leave it off where that matters.
 
 ### Chart API
 

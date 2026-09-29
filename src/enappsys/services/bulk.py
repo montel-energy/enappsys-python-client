@@ -198,7 +198,7 @@ class BulkAPI(APIBase):
         entities: list[str] | None = None,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkCSV: ...
 
@@ -213,7 +213,7 @@ class BulkAPI(APIBase):
         time_zone: str | TimeZoneEnum,
         entities: list[str] | None = None,
         min_avg_max: bool = False,
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkJSON: ...
 
@@ -228,7 +228,7 @@ class BulkAPI(APIBase):
         time_zone: str | TimeZoneEnum,
         entities: list[str] | None = None,
         min_avg_max: bool = False,
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkJSONMap: ...
 
@@ -257,7 +257,7 @@ class BulkAPI(APIBase):
         entities: list[str] | None = None,
         min_avg_max: bool = False,
         delimiter: str | DelimiterEnum = "comma",
-        chunk_rows: int | None = None,
+        chunk_rows: bool | int | None = None,
         units: str | None = None,
     ) -> BulkCSV | BulkJSON | BulkJSONMap | BulkXML:
         response_format_enum = self._get_response_format(response_format)

@@ -1,22 +1,21 @@
 """Proactive chunking: splitting wide requests before sending them.
 
-The platform answers some series far more slowly than others, and for those the
-cost grows faster than linearly with the rows requested -- a one-year quarter-
-hourly request measured 105s as a single call and 7.7s split into 24. Chunking
-already existed here, but only as a fallback after an HTTP 413, which those
-requests never trigger because they succeed, slowly.
+Chunking already existed here, but only as a fallback after an HTTP 413.
+Requests wide enough to be worth splitting do not necessarily trigger that, so
+it now also happens up front, above a row budget.
 
 These tests use a fake session rather than the live API, so they assert on how
-requests are split rather than on how long they take.
+requests are split, not on what comes back.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from enappsys.config import CHUNK_ROWS
+from enappsys.exceptions import ContentTooLarge
 from enappsys.services.bulk import BulkAPI
 
 
@@ -49,6 +48,8 @@ START = datetime(2024, 1, 1)
 
 
 def call(api, *, days, entities=("A",), response_format="csv", **kwargs):
+    """Opts in to splitting unless a test says otherwise; it is off by default."""
+    kwargs.setdefault("chunk_rows", CHUNK_ROWS)
     return api.get(
         response_format,
         data_type="SOME_TYPE",
@@ -83,25 +84,29 @@ class TestRowEstimate:
 class TestShouldChunk:
     def test_below_the_budget_is_left_alone(self, api):
         assert not api._should_chunk(
-            datetime(2024, 1, 1), datetime(2024, 1, 10), "qh"
+            datetime(2024, 1, 1), datetime(2024, 1, 10), "qh", chunk_rows=CHUNK_ROWS
         )
 
     def test_above_the_budget_is_split(self, api):
         assert api._should_chunk(
-            datetime(2024, 1, 1), datetime(2024, 12, 31), "qh"
+            datetime(2024, 1, 1), datetime(2024, 12, 31), "qh", chunk_rows=CHUNK_ROWS
         )
 
     def test_entities_count_against_the_budget(self, api):
         """Two entities cost the same as two single-entity requests, so the
         budget is cells rather than rows."""
         span = (datetime(2024, 1, 1), datetime(2024, 2, 1))  # 2976 rows, under 5000
-        assert not api._should_chunk(*span, "qh", series=1)
-        assert api._should_chunk(*span, "qh", series=2)
+        assert not api._should_chunk(*span, "qh", CHUNK_ROWS, series=1)
+        assert api._should_chunk(*span, "qh", CHUNK_ROWS, series=2)
 
     def test_a_missing_bound_means_a_rolling_window(self, api):
         """Chart-style rolling windows have no range to walk."""
-        assert not api._should_chunk(None, datetime(2024, 12, 31), "qh")
-        assert not api._should_chunk(datetime(2024, 1, 1), None, "qh")
+        assert not api._should_chunk(
+            None, datetime(2024, 12, 31), "qh", chunk_rows=CHUNK_ROWS
+        )
+        assert not api._should_chunk(
+            datetime(2024, 1, 1), None, "qh", chunk_rows=CHUNK_ROWS
+        )
 
     def test_zero_budget_disables_it(self, api):
         assert not api._should_chunk(
@@ -147,7 +152,7 @@ class TestRequestSplitting:
         call(api, days=360, entities=("A", "B", "C", "D"))
         assert len(api._session.requests) == two * 2
 
-    def test_an_explicit_budget_overrides_the_default(self, api):
+    def test_a_wider_budget_means_fewer_requests(self, api):
         call(api, days=360, chunk_rows=50_000)
         assert len(api._session.requests) == 1
 
@@ -181,6 +186,7 @@ class TestBoundaryAlignment:
             end_dt=unaligned + timedelta(days=365),
             resolution="qh",
             time_zone="UTC",
+            chunk_rows=CHUNK_ROWS,
         )
         requests = api._session.requests
         assert len(requests) > 1, "expected this window to be split"
@@ -203,6 +209,7 @@ class TestBoundaryAlignment:
             end_dt=end,
             resolution="qh",
             time_zone="UTC",
+            chunk_rows=CHUNK_ROWS,
         )
         requests = api._session.requests
         assert requests[0]["start"] == unaligned.strftime("%Y%m%d%H%M")
@@ -234,3 +241,181 @@ class TestBoundaryAlignment:
         assert snapped <= unaligned
         midnight = unaligned.replace(hour=0, minute=0, second=0, microsecond=0)
         assert (snapped - midnight).total_seconds() % delta.total_seconds() == 0
+
+
+    def test_boundaries_clear_the_hour_for_coarser_series(self, api):
+        """A series can be published coarser than the resolution requested.
+
+        ENTSOE generation for the Nordic zones is hourly and is routinely
+        fetched at quarter-hourly. A boundary on the requested grid but inside
+        an hour is rounded outward by both neighbouring chunks on the series'
+        own grid, and the row at that point comes back twice. The real case:
+        28 days over seven entities, starting at 12:45.
+        """
+        start = datetime(2024, 1, 1, 12, 45)
+        api.get(
+            "csv",
+            data_type="SOME_TYPE",
+            entities=["A", "B", "C", "D", "E", "F", "G"],
+            start_dt=start,
+            end_dt=start + timedelta(days=28),
+            resolution="qh",
+            time_zone="UTC",
+            chunk_rows=CHUNK_ROWS,
+        )
+        requests = api._session.requests
+        assert len(requests) > 1, "expected this window to be split"
+        for request in requests[1:]:
+            assert request["start"].endswith("00"), (
+                f"boundary sits inside an hour: {request['start']}"
+            )
+
+
+AWARE = datetime(2024, 1, 1, tzinfo=timezone.utc)
+NAIVE = datetime(2024, 1, 1)
+
+
+class TestMixedAwarenessBounds:
+    """One aware and one naive bound, which callers produce by accident.
+
+    `pendulum` returns a *naive* DateTime from `astimezone(...) + timedelta`,
+    so deriving `end_dt` that way from an aware `start_dt` yields one of each.
+    Before chunking the client only ever formatted each bound, which does not
+    care; the first arithmetic between them turned that into a TypeError at the
+    top of every request, whatever its size, and even when nothing would split.
+    """
+
+    @pytest.mark.parametrize(
+        "start,end",
+        [
+            (AWARE, NAIVE + timedelta(days=1)),
+            (NAIVE, AWARE + timedelta(days=1)),
+            (AWARE, AWARE + timedelta(days=1)),
+            (NAIVE, NAIVE + timedelta(days=1)),
+        ],
+        ids=["aware-naive", "naive-aware", "both-aware", "both-naive"],
+    )
+    def test_the_chunk_decision_never_raises(self, api, start, end):
+        assert api._should_chunk(start, end, "qh", CHUNK_ROWS, series=1) is False
+
+    def test_the_estimate_ignores_the_offset(self, api):
+        """Bounds are sent as wall clock, so the span is the wall-clock one."""
+        assert api._estimated_rows(AWARE, NAIVE + timedelta(days=1), "qh") == 96
+
+    def test_a_split_request_survives_mixed_bounds(self, api):
+        api.get(
+            "csv",
+            data_type="SOME_TYPE",
+            entities=["A"],
+            start_dt=AWARE,
+            end_dt=NAIVE + timedelta(days=150),
+            resolution="qh",
+            time_zone="UTC",
+            chunk_rows=CHUNK_ROWS,
+        )
+        assert len(api._session.requests) > 1
+
+
+class TestSplittingIsOptIn:
+    """Several requests are not one request.
+
+    If the range is updated while the chunks are in flight, the later ones
+    carry the new values and the earlier ones do not. Nothing here can detect
+    that, let alone repair it, so a caller chooses splitting rather than
+    getting it by default.
+    """
+
+    def _fetch(self, api, days=1095, **kwargs):
+        api.get(
+            "csv",
+            data_type="SOME_TYPE",
+            entities=["A"],
+            start_dt=START,
+            end_dt=START + timedelta(days=days),
+            resolution="qh",
+            time_zone="UTC",
+            **kwargs,
+        )
+        return api._session.requests
+
+    def test_a_wide_range_is_one_request_by_default(self, api):
+        assert len(self._fetch(api)) == 1
+
+    def test_asking_for_it_splits(self, api):
+        assert len(self._fetch(api, chunk_rows=CHUNK_ROWS)) > 1
+
+    def test_the_413_fallback_still_splits(self, api):
+        """The reactive path is untouched: it is what keeps an oversized
+        request working at all, and it is not a choice the caller makes."""
+        original = api._session.get
+        calls = {"n": 0}
+
+        def raise_once(url, params):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ContentTooLarge("payload too large")
+            return original(url, params)
+
+        api._session.get = raise_once
+        # The reactive path splits at API_MAX_ROWS, so the range has to exceed it.
+        assert len(self._fetch(api, days=1825)) > 1
+
+
+class TestBoundaryGrids:
+    def test_grids_come_from_the_platform_resolutions(self, api):
+        """Every resolution up to a day divides a day evenly, which is what
+        makes flooring from midnight well defined. Weekly and longer need an
+        epoch to count from, so they are left out."""
+        grids = api._boundary_grids(timedelta(minutes=15))
+        assert grids == sorted(grids, reverse=True)
+        assert grids[0] == timedelta(days=1)
+        assert all(timedelta(minutes=15) < g <= timedelta(days=1) for g in grids)
+        assert all(86400 % g.total_seconds() == 0 for g in grids)
+
+    def test_nothing_coarser_than_the_resolution_asked_for(self, api):
+        assert api._boundary_grids(timedelta(days=1)) == []
+
+
+class TestOptInForms:
+    """What `chunk_rows` accepts, and what each form means."""
+
+    WIDE = timedelta(days=1095)   # 105,120 qh rows, under API_MAX_ROWS
+
+    def _requests(self, api, **kwargs):
+        api.get(
+            "csv",
+            data_type="SOME_TYPE",
+            entities=["A"],
+            start_dt=START,
+            end_dt=START + self.WIDE,
+            resolution="qh",
+            time_zone="UTC",
+            **kwargs,
+        )
+        return api._session.requests
+
+    @pytest.mark.parametrize("value", [None, False, 0])
+    def test_these_all_mean_one_request(self, api, value):
+        assert api._resolve_chunk_rows(value) is None
+        assert len(self._requests(api, chunk_rows=value)) == 1
+
+    def test_true_means_the_configured_budget(self, api):
+        """Opting in without naming a number picks CHUNK_ROWS, so `True` and
+        passing that constant are the same request pattern."""
+        assert api._resolve_chunk_rows(True) == CHUNK_ROWS
+
+    def test_true_and_the_constant_split_identically(self, api):
+        by_flag = [dict(r) for r in self._requests(api, chunk_rows=True)]
+        api._session.requests.clear()
+        by_number = [dict(r) for r in self._requests(api, chunk_rows=CHUNK_ROWS)]
+        assert len(by_flag) > 1
+        assert by_flag == by_number
+
+    def test_an_int_names_the_budget(self, api):
+        assert api._resolve_chunk_rows(1234) == 1234
+
+    def test_true_is_not_read_as_the_number_one(self, api):
+        """`isinstance(True, int)` is True, so the order of the checks matters:
+        read as 1, every request would split into single rows."""
+        assert api._resolve_chunk_rows(True) != 1
+        assert api._resolve_chunk_rows(1) == 1

@@ -20,8 +20,8 @@ class APIBaseAsync(APIBase):
         chunk_rows: int | None = None,
     ):
         """Fire fixed-size chunk requests concurrently; AsyncSession rate limiter spaces starts."""
-        start_dt_obj = self._get_dt(start_dt, "start_dt")
-        end_dt_obj = self._get_dt(end_dt, "end_dt")
+        start_dt_obj = self._wall_clock(start_dt, "start_dt")
+        end_dt_obj = self._wall_clock(end_dt, "end_dt")
 
         delta = ResolutionEnum._from_value(resolution).delta
         # TODO: now only chunking 'smarter' for 1 sec,
@@ -40,12 +40,10 @@ class APIBaseAsync(APIBase):
             if chunk_end_dt >= end_dt_obj:
                 chunk_end_dt = end_dt_obj
             else:
-                # Interior boundaries must land on the resolution grid, or the
-                # platform rounds them outward for both neighbouring chunks and
-                # the row at the boundary comes back twice.
-                snapped = self._floor_to_resolution(chunk_end_dt, delta)
-                if snapped > cursor:
-                    chunk_end_dt = snapped
+                # Interior boundaries must land on a grid the platform shares,
+                # or it rounds them outward for both neighbouring chunks and the
+                # row at the boundary comes back twice. See `_snap_boundary`.
+                chunk_end_dt = self._snap_boundary(chunk_end_dt, delta, after=cursor)
             chunk_params = copy.deepcopy(params)
             self._add_dt(chunk_params, cursor, "start", "start_dt")
             self._add_dt(chunk_params, chunk_end_dt, "end", "end_dt")
