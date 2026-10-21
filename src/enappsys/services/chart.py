@@ -14,7 +14,8 @@ from enappsys.enum import (
     TimeZoneEnum,
 )
 from enappsys.exceptions import ContentTooLarge, ValidationError
-from enappsys.services.base import APIBase, JSONBase, JSONMapBase, _warn_empty_response
+from enappsys.services.base import APIBase, JSONBase, JSONMapBase, _request_context, _warn_empty_response
+from enappsys.timezones import localize_index
 from enappsys.utils import validate_rename_columns_length, require_pandas
 
 if TYPE_CHECKING:
@@ -157,7 +158,9 @@ class ChartCSV(ChartBase):
             _warn_empty_response("csv", url=self.url, params=self.params)
             df.index = pd.DatetimeIndex([], name="dateTime")
         if tz_localize:
-            df.index = df.index.tz_localize(self.time_zone, ambiguous="infer")
+            df.index = localize_index(
+                df.index, self.time_zone, context=_request_context(self.url, self.params)
+            )
 
         step_size = 1
         if self.min_avg_max:
