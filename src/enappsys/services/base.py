@@ -17,6 +17,7 @@ from enappsys.enum import (
 from enappsys.config import CHUNK_ROWS
 from enappsys.exceptions import ValidationError
 from enappsys.utils import dt_series_format, require_pandas
+from enappsys.timezones import localize_index
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -24,11 +25,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-def _warn_empty_response(
-    response_format: str,
-    url: str | None = None,
-    params: dict | None = None,
-) -> None:
+def _request_context(url: str | None = None, params: dict | None = None) -> str:
     details = []
     if url:
         details.append(f"url={url}")
@@ -38,11 +35,18 @@ def _warn_empty_response(
         # warning can be traced back to an account.
         request_params.pop("pass", None)
         details.append(f"params={request_params}")
+    return "; ".join(details)
 
-    context = f" ({'; '.join(details)})" if details else ""
+
+def _warn_empty_response(
+    response_format: str,
+    url: str | None = None,
+    params: dict | None = None,
+) -> None:
+    context = _request_context(url, params)
     logger.warning(
         f"No data returned for {response_format} response; "
-        f"returning empty DataFrame.{context}"
+        f"returning empty DataFrame.{f' ({context})' if context else ''}"
     )
 
 
@@ -564,8 +568,8 @@ class JSONBase:
         df_records = df_records.set_index("dateTime", drop=True)
         df_records.index = pd.to_datetime(df_records.index, format="%Y-%m-%dT%H:%M:%S")
         if tz_localize:
-            df_records.index = df_records.index.tz_localize(
-                self.time_zone, ambiguous="infer"
+            df_records.index = localize_index(
+                df_records.index, self.time_zone, context=_request_context(self.url, self.params)
             )
 
         data_type_entity_groups = df_records.groupby("dataTypeEntity")
@@ -689,7 +693,9 @@ class JSONMapBase:
 
         df_map.index = pd.to_datetime(df_map.index, format="%Y-%m-%dT%H:%M:%S")
         if tz_localize:
-            df_map.index = df_map.index.tz_localize(self.time_zone, ambiguous="infer")
+            df_map.index = localize_index(
+                df_map.index, self.time_zone, context=_request_context(self.url, self.params)
+            )
 
         df = pd.DataFrame(index=df_map.index)
         df.index.name = "dateTime"

@@ -4,6 +4,24 @@ The section matching the version in `src/enappsys/__init__.py` becomes the body
 of the GitHub release. Without a matching section the release falls back to a
 list of commit subjects, so anything worth explaining belongs here.
 
+## 0.3.1
+
+### Clock changes no longer fail a request
+
+Results requested in a local time zone such as `CET` are localized by
+inferring which of the two autumn 02:00 hours each row belongs to. That only
+works when the series repeats the hour. Some series do not:
+`PRICES_FOR_NL_CCGT_SS`, a daily value repeated hourly, comes back with 02:00
+once on 25 October 2026, and every request covering that day raised
+`Cannot infer dst time`, taking down whatever depended on it.
+
+When the inference fails, the result is now localized anyway, and a warning
+names the request. A time the data does not place is taken as the first
+(summer-time) occurrence, and a spring time that does not exist moves to the
+next valid time. Series that repeat the hour as they should are localized
+exactly as before. This applies to `bulk` and `chart` results in every
+format, on both the synchronous and asynchronous clients.
+
 ## 0.3.0
 
 ### Splitting wide requests
