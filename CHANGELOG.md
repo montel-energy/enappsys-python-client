@@ -4,6 +4,22 @@ The section matching the version in `src/enappsys/__init__.py` becomes the body
 of the GitHub release. Without a matching section the release falls back to a
 list of commit subjects, so anything worth explaining belongs here.
 
+## 0.4.0
+
+### Installable CLI
+
+`pip install enappsys` now puts an `enappsys` command on your PATH (Linux,
+macOS, and Windows PowerShell). It wraps the synchronous client for bulk,
+chart, price-volume-curve, and EPEX downloads, writing the raw response to
+stdout or `-o`. Credentials resolve the same way as the library; see the
+README CLI section and `enappsys --help`.
+
+Optional interactive tables use Textual via `pip install enappsys[tui]`
+(pulls in pandas as well). Pass `--table` on a download command to open a
+scrollable DataTable (`q` to quit); combine with `-o` to save the raw file
+too. The view shows at most 10,000 rows; larger results are truncated with a
+subtitle count. XML responses have no table view.
+
 ## 0.3.1
 
 ### Clock changes no longer fail a request

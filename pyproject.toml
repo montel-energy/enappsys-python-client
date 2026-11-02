@@ -19,8 +19,12 @@ license = "MIT"
 license-files = ["LICEN[CS]E*"]
 dependencies = [
     "requests",
+    "typer",
 ]
 dynamic = ["version"]
+
+[project.scripts]
+enappsys = "enappsys.cli:app"
 
 [project.optional-dependencies]
 async = [
@@ -30,9 +34,13 @@ pandas = [
     "pandas",
     "tzdata",
 ]
+tui = [
+    "textual",
+    "enappsys[pandas]",
+]
 dev = [
     "enappsys[async]",
-    "enappsys[pandas]",
+    "enappsys[tui]",
     "pytest-asyncio",
     "pytest-benchmark",
     "pytest",
