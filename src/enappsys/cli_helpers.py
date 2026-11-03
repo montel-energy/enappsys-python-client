@@ -29,7 +29,7 @@ TableFlag = Annotated[
         "--table",
         help=(
             "Open an interactive Textual table view instead of printing CSV to stdout "
-            "(first 10,000 rows). Requires: pip install enappsys[tui]. "
+            "(first 10,000 rows). "
             "Can be combined with -o to also save."
         ),
     ),

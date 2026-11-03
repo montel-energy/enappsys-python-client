@@ -475,11 +475,11 @@ def test_bulk_table_with_output_still_writes_file(monkeypatch, tmp_path):
     assert shown["called"] is True
 
 
-def test_show_table_requires_tui_extra(monkeypatch):
+def test_show_table_requires_cli_extra(monkeypatch):
     from enappsys import cli_table
 
     def boom():
-        raise ImportError("Interactive table view requires the tui extra.")
+        raise ImportError("Interactive table view requires the cli extra.")
 
     monkeypatch.setattr(cli_table, "require_textual", boom)
 

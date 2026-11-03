@@ -18,8 +18,8 @@ def require_textual():
         import textual
     except ModuleNotFoundError as e:
         raise ImportError(
-            "Interactive table view requires the tui extra. "
-            "Install with: pip install enappsys[tui]"
+            "Interactive table view requires the cli extra. "
+            "Install with: pip install enappsys[cli]"
         ) from e
     return textual
 
@@ -75,7 +75,7 @@ def _subtitle(shown: int, total: int, truncated: bool) -> str:
 
 
 def show_table(result: Any, title: str = "EnAppSys") -> None:
-    """Open a Textual DataTable for ``result`` (needs ``enappsys[tui]``).
+    """Open a Textual DataTable for ``result`` (needs ``enappsys[cli]``).
 
     At most :data:`TABLE_ROW_LIMIT` rows are shown; larger frames are truncated.
     """

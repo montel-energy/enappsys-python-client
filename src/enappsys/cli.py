@@ -36,7 +36,13 @@ def main(
     ] = None,
     secret: Annotated[
         Optional[str],
-        typer.Option("--secret", help="EnAppSys secret (overrides env / credentials file)."),
+        typer.Option(
+            "--secret",
+            help=(
+                "EnAppSys secret (overrides env / credentials file). "
+                "ENAPPSYS_SECRET or the credentials file keeps it out of shell history."
+            ),
+        ),
     ] = None,
     credentials_file: Annotated[
         Optional[str],
