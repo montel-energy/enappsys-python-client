@@ -26,12 +26,23 @@ The extras are optional:
 
 - `pandas` required for converting API responses to DataFrames, e.g. via `client_response.to_df()`
 - `async` required for using the `EnAppSysAsync` asynchronous client.
+- `cli` required for the `enappsys` command-line tool, including its `--table` viewer (installs Typer, Textual and pandas)
 
 If you only need the synchronous client and raw responses, install without extras:
 
 ```bash
 pip install enappsys
 ```
+
+For the `enappsys` command-line tool (see [CLI](#cli) below):
+
+```bash
+pip install enappsys[cli]
+```
+
+On Windows, if the command is not found after install, use
+`python -m enappsys` instead, or ensure Python’s Scripts directory is on your
+PATH.
 
 ### Configuring credentials
 
@@ -59,9 +70,18 @@ The client looks for credentials in the following order:
     
 2. **Environment variables**:
 
+    Linux / macOS:
+
     ```bash
     export ENAPPSYS_USER=example_user
     export ENAPPSYS_SECRET=123456789123456789123456789123456789
+    ```
+
+    Windows PowerShell:
+
+    ```powershell
+    $env:ENAPPSYS_USER="example_user"
+    $env:ENAPPSYS_SECRET="123456789123456789123456789123456789"
     ```
 
 3. **Credentials file** at your home directory, the default location is: `~/.credentials/enappsys.json`:
@@ -387,6 +407,51 @@ An asynchronous client (`EnAppSysAsync`) is available for non-blocking and concu
 
 The asynchronous interface is currently under active development.
 Usage examples and extended documentation will be added in a future release.
+
+## CLI
+
+After `pip install enappsys[cli]`, download data without writing a script:
+
+```bash
+enappsys --help
+enappsys version
+enappsys auth check
+```
+
+Bulk example (writes CSV to a file; omit `-o` to print to stdout):
+
+```bash
+enappsys bulk \
+  --data-type EPEX_HR_AUCTION_RESULTS_DE \
+  --entity DA_PRICE --entity DA_VOLUME \
+  --start 2025-01-01T00:00 --end 2025-01-02T00:00 \
+  --resolution qh --tz CET \
+  -o day_ahead.csv
+```
+
+Interactive table (press `q` to quit).
+At most 10,000 rows are shown; use `-o` to keep the full raw download:
+
+```bash
+enappsys bulk \
+  --data-type EPEX_HR_AUCTION_RESULTS_DE \
+  --start 2025-01-01T00:00 --end 2025-01-02T00:00 \
+  --resolution qh --tz CET \
+  --table
+```
+
+Other commands: `enappsys chart`, `enappsys pvc`, `enappsys epex contract`,
+`enappsys epex settlement`. Global options `--user`, `--secret`, and
+`--credentials-file` override the same credential sources as the Python client.
+All download commands accept `--table`.
+
+PowerShell uses the same flags (line continuation with `` ` `` if needed):
+
+```powershell
+enappsys bulk --data-type EPEX_HR_AUCTION_RESULTS_DE `
+  --start 2025-01-01T00:00 --end 2025-01-02T00:00 `
+  --resolution qh --tz CET -o day_ahead.csv
+```
 
 ## License
 

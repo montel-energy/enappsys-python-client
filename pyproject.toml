@@ -22,6 +22,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.scripts]
+enappsys = "enappsys.__main__:main"
+
 [project.optional-dependencies]
 async = [
     "aiohttp"
@@ -30,9 +33,14 @@ pandas = [
     "pandas",
     "tzdata",
 ]
+cli = [
+    "typer",
+    "textual",
+    "enappsys[pandas]",
+]
 dev = [
     "enappsys[async]",
-    "enappsys[pandas]",
+    "enappsys[cli]",
     "pytest-asyncio",
     "pytest-benchmark",
     "pytest",
